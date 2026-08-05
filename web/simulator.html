@@ -1,0 +1,888 @@
+<meta charset="utf-8">
+<title>產線風速風場模擬觀測器</title>
+<style>
+  :root {
+    --bg: #0d1117; --panel: #161b22; --line: #30363d;
+    --fg: #e6edf3; --dim: #8b949e; --accent: #58a6ff;
+    --warn: #f0883e; --hot: #f85149; --ok: #3fb950; --lat: #d2a8ff;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; padding: 16px;
+    background: var(--bg); color: var(--fg);
+    font-family: "Noto Sans TC", "PingFang TC", "Microsoft JhengHei", system-ui, sans-serif;
+    font-size: 14px; line-height: 1.5;
+  }
+  h1 { font-size: 19px; margin: 0 0 2px; font-weight: 650; }
+  .sub { color: var(--dim); font-size: 12.5px; margin-bottom: 14px; }
+  .wrap { max-width: 1320px; margin: 0 auto; }
+  .grid { display: grid; grid-template-columns: 272px 1fr; gap: 14px; align-items: start; }
+  @media (max-width: 900px) { .grid { grid-template-columns: 1fr; } }
+
+  .card {
+    background: var(--panel); border: 1px solid var(--line);
+    border-radius: 9px; padding: 12px 14px; margin-bottom: 14px;
+  }
+  .card h2 {
+    font-size: 12px; text-transform: uppercase; letter-spacing: .07em;
+    color: var(--dim); margin: 0 0 10px; font-weight: 600;
+  }
+
+  .ctl { margin-bottom: 13px; }
+  .ctl label {
+    display: flex; justify-content: space-between; align-items: baseline;
+    font-size: 12.5px; margin-bottom: 4px;
+  }
+  .ctl .val { font-variant-numeric: tabular-nums; color: var(--accent); font-weight: 600; }
+  input[type=range] { width: 100%; accent-color: var(--accent); margin: 0; }
+
+  .btnrow { display: flex; gap: 8px; margin-bottom: 12px; }
+  button {
+    flex: 1; padding: 9px 10px; border-radius: 6px; cursor: pointer;
+    border: 1px solid var(--line); background: #21262d; color: var(--fg);
+    font-size: 13px; font-family: inherit; font-weight: 600;
+  }
+  button:hover { border-color: var(--dim); }
+  button.run { background: #1f6f3f; border-color: #2ea043; }
+  button.stop { background: #6e2b28; border-color: var(--hot); }
+
+  /* CSS 高度必須固定：fitCanvas 會寫入 cv.height，若 CSS 未定高度，
+     該屬性會回頭決定版面高度，造成每幀放大的回饋迴圈。 */
+  canvas { display: block; width: 100%; border-radius: 6px; background: #010409; }
+  #cLine { height: 150px; }
+  #cGap { height: 240px; }
+  #cTraj, #cDrift { height: 230px; }
+  #cSeries { height: 150px; }
+  .cap { color: var(--dim); font-size: 11.5px; margin-top: 6px; }
+
+  table.read { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+  table.read td { padding: 3px 0; }
+  table.read td:last-child {
+    text-align: right; font-variant-numeric: tabular-nums; font-weight: 600;
+  }
+  .phase {
+    display: inline-block; padding: 1px 9px; border-radius: 10px;
+    font-size: 11.5px; font-weight: 600;
+  }
+  .note {
+    font-size: 11.5px; color: var(--dim); border-left: 2px solid var(--line);
+    padding-left: 9px; margin-top: 10px;
+  }
+  .two { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+  @media (max-width: 760px) { .two { grid-template-columns: 1fr; } }
+</style>
+
+<div class="wrap">
+  <h1>產線風速風場模擬觀測器</h1>
+  <div class="sub">
+    熱發泡（TIJ）噴碼設備固定於輸送帶上方，噴嘴距箱頂 3~5mm。
+    觀察間隙內的氣流場，以及 300 顆墨滴的飄移方向。
+  </div>
+
+  <div class="grid">
+    <!-- ============ 控制面板 ============ -->
+    <div>
+      <div class="card">
+        <h2>產線控制</h2>
+        <div class="btnrow">
+          <button id="run" class="run">▶ 開始</button>
+          <button id="reset">↺ 重置</button>
+        </div>
+        <div class="ctl">
+          <label>產線速度 <span class="val" id="vSpeed"></span></label>
+          <input type="range" id="speed" min="0" max="350" step="5" value="350">
+        </div>
+        <div class="ctl">
+          <label>慢動作 <span class="val" id="vSlow"></span></label>
+          <input type="range" id="slow" min="1" max="100" step="1" value="25">
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>箱子 / 噴頭</h2>
+        <div class="ctl">
+          <label>箱重 <span class="val" id="vMass"></span></label>
+          <input type="range" id="mass" min="5" max="50" step="1" value="20">
+        </div>
+        <div class="ctl">
+          <label>箱間距 <span class="val" id="vSpacing"></span></label>
+          <input type="range" id="spacing" min="30" max="50" step="1" value="40">
+        </div>
+        <div class="ctl">
+          <label>噴嘴間隙 <span class="val" id="vGap"></span></label>
+          <input type="range" id="gap" min="3" max="5" step="0.1" value="4">
+        </div>
+        <div class="ctl">
+          <label>墨滴體積 <span class="val" id="vVol"></span></label>
+          <input type="range" id="vol" min="10" max="50" step="1" value="30">
+        </div>
+        <div class="ctl">
+          <label>噴發初速 <span class="val" id="vEject"></span></label>
+          <input type="range" id="eject" min="3" max="10" step="0.5" value="8">
+        </div>
+        <div class="ctl">
+          <label>噴印帶高度 <span class="val" id="vPh"></span></label>
+          <input type="range" id="ph" min="0" max="1" step="1" value="1">
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>即時數值</h2>
+        <table class="read">
+          <tr><td>循環階段</td><td><span class="phase" id="rPhase">—</span></td></tr>
+          <tr><td>間隙平均風速</td><td id="rMean">—</td></tr>
+          <tr><td>間隙最大風速</td><td id="rMax">—</td></tr>
+          <tr><td>瞬時間隙</td><td id="rGap">—</td></tr>
+          <tr><td>飛行時間</td><td id="rFlight">—</td></tr>
+          <tr><td style="color:var(--accent)">縱向飄移 Δx</td><td id="rDx">—</td></tr>
+          <tr><td style="color:var(--lat)">橫向飄移 Δy（兩端）</td><td id="rDy">—</td></tr>
+          <tr><td style="color:var(--hot)">合成飄移最大</td><td id="rMag">—</td></tr>
+          <tr><td style="color:var(--hot)">換算點距</td><td id="rDot">—</td></tr>
+          <tr><td>飄移角度（兩端）</td><td id="rAng">—</td></tr>
+          <tr><td>擾動循環頻率</td><td id="rFreq">—</td></tr>
+          <tr><td>Stokes 數</td><td id="rStk">—</td></tr>
+        </table>
+        <div class="note" id="noteX"></div>
+      </div>
+    </div>
+
+    <!-- ============ 視圖 ============ -->
+    <div>
+      <div class="card">
+        <h2>產線總覽（右 → 左）</h2>
+        <canvas id="cLine" height="150"></canvas>
+        <div class="cap">
+          箱子連續不間斷通過固定噴頭。黃色框為下方放大的 3~5mm 觀測區。
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>間隙風場 X-Z 側視 <span style="color:var(--dim);font-weight:400">（需求 5-1）</span></h2>
+        <canvas id="cGap" height="240"></canvas>
+        <div class="cap">
+          色階 = 風速大小，箭頭 = 風向。上緣為靜止的噴嘴板（no-slip），
+          下緣為隨箱移動的箱頂面。箱下時形成線性 Couette 剪切；
+          箱間開放區 Couette 消失，只剩尾流。
+        </div>
+      </div>
+
+      <div class="two">
+        <div class="card">
+          <h2>墨滴軌跡 <span style="color:var(--dim);font-weight:400">（5-2a）</span></h2>
+          <canvas id="cTraj" height="230"></canvas>
+          <div class="cap">左：縱向 X-Z。右：橫向 Y-Z 扇形外散。</div>
+        </div>
+        <div class="card">
+          <h2>300 噴嘴飄移 <span style="color:var(--dim);font-weight:400">（5-2b）</span></h2>
+          <canvas id="cDrift" height="230"></canvas>
+          <div class="cap">
+            中央 Δy≈0（逸出路徑最長），兩端對稱外偏（緊鄰噴嘴板逸流出口）。
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>間隙風速時間序列 <span style="color:var(--dim);font-weight:400">（5-1c）</span></h2>
+        <canvas id="cSeries" height="150"></canvas>
+        <div class="cap">
+          綠底 = 箱體在噴頭下（拘束間隙），紅底 = 箱間開放區。
+          前緣抵達時可見暫態脈衝尖峰。
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+"use strict";
+// =====================================================================
+// 物理常數（與 sim/config.py 一致）
+// =====================================================================
+const AIR = { rho: 1.204, mu: 1.813e-5 };
+const INK = { rho: 1050 };
+const G = 9.80665;
+const INCH = 0.0254;
+
+// 風場校正係數（與 sim/config.py 的預設值一致）
+const K = {
+  cLeading: 0.30, cTrailing: 0.15, sigmaEdge: 0.015,
+  cLateral: 0.35, cLateralSteady: 0.05, pLateral: 1.0,
+  cVertical: 0.15, cWake: 0.25, wakeLength: 0.15,
+  driveForce: 300, beltInertia: 20, frictionMu: 0.60,
+  bounceAmpRef: 0.15e-3, bounceMassRef: 5, bounceStiff: 6.16e5,
+  plateX: 0.015,
+};
+
+// =====================================================================
+// 參數
+// =====================================================================
+const P = {
+  speedMMin: 350, mass: 20, gapMm: 4, dropletPl: 30, spacingCm: 40,
+  eject: 8, printHeightIn: 1.0, nNozzles: 300,
+  boxLen: 0.5, boxH: 0.5, fireHz: 15000,
+
+  get beltSpeed() { return this.speedMMin / 60; },
+  get gap() { return this.gapMm / 1000; },
+  get spacing() { return this.spacingCm / 100; },
+  get pitch() { return this.boxLen + this.spacing; },
+  get cyclePeriod() { return this.beltSpeed > 0 ? this.pitch / this.beltSpeed : Infinity; },
+  get cycleHz() { return this.beltSpeed > 0 ? this.beltSpeed / this.pitch : 0; },
+  get printHeight() { return this.printHeightIn * INCH; },
+  get nozzlePitch() { return this.printHeight / this.nNozzles; },
+  get dpi() { return this.nNozzles / this.printHeightIn; },
+  get plateHalfY() { return this.printHeight / 2; },
+  get dropVolume() { return this.dropletPl * 1e-15; },
+  get dropDiameter() { return Math.cbrt(6 * this.dropVolume / Math.PI); },
+  get tau() { const d = this.dropDiameter; return INK.rho * d * d / (18 * AIR.mu); },
+  get bounceAmp() { return K.bounceAmpRef * (K.bounceMassRef / this.mass); },
+  get bounceFreq() { return Math.sqrt(K.bounceStiff / this.mass) / (2 * Math.PI); },
+  get beltAccelLimit() { return K.driveForce / (K.beltInertia + this.mass); },
+  get boxAccelLimit() { return K.frictionMu * G; },
+};
+
+// =====================================================================
+// 皮帶狀態（即時積分，含啟停斜坡與質量耦合）
+// =====================================================================
+const belt = { vBelt: 0, vBox: 0, dist: 0, simTime: 0, running: false };
+
+function beltStep(dt) {
+  const target = belt.running ? P.beltSpeed : 0;
+  // 路徑 1: 驅動力有限 -> 箱越重整線加速越慢
+  const aB = clamp((target - belt.vBelt) / dt, -P.beltAccelLimit, P.beltAccelLimit);
+  belt.vBelt += aB * dt;
+  // 路徑 2: 摩擦極限 mu*g -> 超過即打滑
+  const aX = clamp((belt.vBelt - belt.vBox) / dt, -P.boxAccelLimit, P.boxAccelLimit);
+  const vPrev = belt.vBox;
+  belt.vBox += aX * dt;
+  belt.dist += 0.5 * (belt.vBox + vPrev) * dt;
+  belt.simTime += dt;
+}
+
+function clamp(v, lo, hi) { return v < lo ? lo : v > hi ? hi : v; }
+function smoothstep(x) { const c = clamp(x, 0, 1); return c * c * (3 - 2 * c); }
+
+/** 目前的箱列相位幾何與間隙。 */
+function beltState() {
+  const pitch = P.pitch;
+  const u = ((belt.dist % pitch) + pitch) % pitch;
+  const w = Math.max(K.plateX / 2, 1e-6);
+  const conf = smoothstep(u / w) * smoothstep((P.boxLen - u) / w);
+
+  const ratio = P.beltSpeed > 0 ? clamp(belt.vBox / P.beltSpeed, 0, 1) : 0;
+  const bounce = P.bounceAmp * ratio * conf *
+                 Math.sin(2 * Math.PI * P.bounceFreq * belt.simTime);
+  const gap = clamp(P.gap + bounce, 0.3 * P.gap, 2 * P.gap);
+
+  return {
+    u, conf, gap, uBox: belt.vBox, t: belt.simTime,
+    sCur: u, sNext: u - pitch, sTrail: u - P.boxLen,
+  };
+}
+
+// =====================================================================
+// 風場（四分量疊加，與 sim/windfield.py 一致）
+// =====================================================================
+function wind(x, y, z, st, out) {
+  const U = st.uBox, h = st.gap;
+  const zeta = clamp(z / h, 0, 1);
+  const profC = 1 - zeta;               // Couette / 開放區剖面（板面為零）
+  const profP = 6 * zeta * (1 - zeta);  // Poiseuille 型（兩壁為零）
+
+  const s = K.sigmaEdge;
+  const e1 = Math.exp(-Math.pow((st.sCur - x) / s, 2));
+  const e2 = Math.exp(-Math.pow((st.sNext - x) / s, 2));
+  const envLead = e1 + e2;
+  const envTrail = Math.exp(-Math.pow((st.sTrail - x) / (1.5 * s), 2));
+  const aEdge = K.cLeading * U * envLead - K.cTrailing * U * envTrail;
+
+  // 1) Couette 剪切  2) 前後緣壓差脈衝  3) 箱間尾流回流
+  const wake = -K.cWake * U * Math.exp(-Math.max(st.sTrail - x, 0) / K.wakeLength);
+  let ux = st.conf * U * profC + aEdge * profP + (1 - st.conf) * wake * profC;
+
+  // 4) 橫向擠壓膜逸流 —— 特徵長度是噴嘴板半長 12.7mm，不是箱半寬 250mm
+  const eta = y / P.plateHalfY;
+  const B = K.cLateral * aEdge + K.cLateralSteady * st.conf * U;
+  const uy = B * Math.sign(eta) * Math.pow(Math.abs(eta), K.pLateral) * profP;
+
+  // 5) 前緣抬升 / 後緣下沉。噴嘴板永遠是實體壁面 -> z=h 恆為零
+  const profV = st.conf * profP + (1 - st.conf) * profC;
+  const uz = K.cVertical * U * (envLead - 0.5 * envTrail) * profV;
+
+  out[0] = ux; out[1] = uy; out[2] = uz;
+  return out;
+}
+
+const _w = [0, 0, 0];
+function gapSpeedStats(st) {
+  let sum = 0, mx = 0;
+  const n = 25;
+  for (let i = 0; i <= n; i++) {
+    wind(0, 0, st.gap * i / n, st, _w);
+    const m = Math.hypot(_w[0], _w[1], _w[2]);
+    sum += m; if (m > mx) mx = m;
+  }
+  return { mean: sum / (n + 1), max: mx };
+}
+
+// =====================================================================
+// 墨滴：完整彈道 + Schiller-Naumann 阻力（與 sim/droplet.py 一致）
+//   a = (1/tau)(1 + 0.15 Re^0.687)(u_air - v) - g ẑ
+// 此形式等價於 ½ρC_d A|u|u，但沒有 Re→0 的奇異點。
+// =====================================================================
+const DT = 2e-6;
+const MAX_STEPS = 1200;
+
+function accel(px, py, pz, vx, vy, vz, st, useWind, o) {
+  let ax = 0, ay = 0, az = 0;
+  if (useWind) { wind(px, py, pz, st, _w); ax = _w[0]; ay = _w[1]; az = _w[2]; }
+  const rx = ax - vx, ry = ay - vy, rz = az - vz;
+  const sp = Math.hypot(rx, ry, rz);
+  const re = AIR.rho * P.dropDiameter * sp / AIR.mu;
+  const corr = (1 + 0.15 * Math.pow(re, 0.687)) / P.tau;
+  o[0] = corr * rx; o[1] = corr * ry; o[2] = corr * rz - G;
+}
+
+const _a1 = [0,0,0], _a2 = [0,0,0], _a3 = [0,0,0], _a4 = [0,0,0];
+
+/** 單顆墨滴積分到 z=0，回傳落點與飛行時間（線性內插求精確值）。 */
+function flyOne(y0, st, useWind, traj) {
+  let px = 0, py = y0, pz = st.gap;
+  let vx = 0, vy = 0, vz = -P.eject;
+  let t = 0;
+  for (let i = 0; i < MAX_STEPS; i++) {
+    if (traj && i % 6 === 0) traj.push(px, py, pz);
+    accel(px, py, pz, vx, vy, vz, st, useWind, _a1);
+    const p2x=px+0.5*DT*vx, p2y=py+0.5*DT*vy, p2z=pz+0.5*DT*vz;
+    const v2x=vx+0.5*DT*_a1[0], v2y=vy+0.5*DT*_a1[1], v2z=vz+0.5*DT*_a1[2];
+    accel(p2x,p2y,p2z, v2x,v2y,v2z, st, useWind, _a2);
+    const p3x=px+0.5*DT*v2x, p3y=py+0.5*DT*v2y, p3z=pz+0.5*DT*v2z;
+    const v3x=vx+0.5*DT*_a2[0], v3y=vy+0.5*DT*_a2[1], v3z=vz+0.5*DT*_a2[2];
+    accel(p3x,p3y,p3z, v3x,v3y,v3z, st, useWind, _a3);
+    const p4x=px+DT*v3x, p4y=py+DT*v3y, p4z=pz+DT*v3z;
+    const v4x=vx+DT*_a3[0], v4y=vy+DT*_a3[1], v4z=vz+DT*_a3[2];
+    accel(p4x,p4y,p4z, v4x,v4y,v4z, st, useWind, _a4);
+
+    const nx = px + DT/6*(vx + 2*v2x + 2*v3x + v4x);
+    const ny = py + DT/6*(vy + 2*v2y + 2*v3y + v4y);
+    const nz = pz + DT/6*(vz + 2*v2z + 2*v3z + v4z);
+    vx += DT/6*(_a1[0]+2*_a2[0]+2*_a3[0]+_a4[0]);
+    vy += DT/6*(_a1[1]+2*_a2[1]+2*_a3[1]+_a4[1]);
+    vz += DT/6*(_a1[2]+2*_a2[2]+2*_a3[2]+_a4[2]);
+
+    if (nz <= 0) {
+      const f = clamp(pz / (pz - nz), 0, 1);
+      const lx = px + f * (nx - px), ly = py + f * (ny - py);
+      if (traj) traj.push(lx, ly, 0);
+      return { x: lx, y: ly, t: t + f * DT };
+    }
+    px = nx; py = ny; pz = nz; t += DT;
+  }
+  return { x: px, y: py, t };
+}
+
+const NOZ_Y = new Float64Array(300);
+function rebuildNozzles() {
+  const n = P.nNozzles, pitch = P.nozzlePitch;
+  for (let i = 0; i < n; i++) NOZ_Y[i] = (i - (n - 1) / 2) * pitch;
+}
+
+const burst = {
+  driftX: new Float64Array(300), driftY: new Float64Array(300),
+  flightTime: 0, trajs: [], gap: 0,
+  st: null, stats: null,   // 計算當下的狀態快照 —— 數值面板一律讀這個
+};
+
+/** 300 顆墨滴同時噴發。飄移誤差以「無風標稱落點」為基準。
+ *  無風時落點恰為 (0, y_nozzle)，故只需算一次標稱飛行時間。
+ *
+ *  效能：完整積分 300 顆需 ~125ms，會讓動畫卡頓。改為積分 NS 個取樣
+ *  噴嘴再沿陣列內插。這在數值上是忠實的 —— 橫向逸流 uy 對 y 為冪次
+ *  關係（預設線性），Δx 沿 25.4mm 陣列的變化僅 0.05%，兩者都極為平滑。
+ *  誤差已對照完整 300 顆計算驗證（見 web/verify-interpolation.js）。 */
+const NS = 31;
+const _si = new Int32Array(NS), _sx = new Float64Array(NS), _sy = new Float64Array(NS);
+
+function fireBurst(st, full) {
+  // 墨滴積分較昂貴，更新率低於畫面。面板必須讀取「計算當下」的狀態，
+  // 否則會把箱下的飄移值配上開放區的風速，得到自相矛盾的讀數。
+  burst.st = st;
+  burst.stats = gapSpeedStats(st);
+
+  const nom = flyOne(0, st, false, null);
+  const U = st.uBox, n = P.nNozzles;
+  burst.trajs.length = 0;
+  burst.gap = st.gap;
+
+  const ns = full ? n : NS;
+  const si = full ? new Int32Array(n) : _si;
+  const sx = full ? new Float64Array(n) : _sx;
+  const sy = full ? new Float64Array(n) : _sy;
+  const drawEvery = Math.max(1, Math.round(ns / 21));
+
+  for (let k = 0; k < ns; k++) {
+    const i = full ? k : Math.round(k * (n - 1) / (ns - 1));
+    const keep = (k % drawEvery === 0);
+    const tr = keep ? [] : null;
+    const r = flyOne(NOZ_Y[i], st, true, tr);
+    si[k] = i;
+    sx[k] = r.x - U * (r.t - nom.t);   // 換算到箱座標系，箱體位移共同項相消
+    sy[k] = r.y - NOZ_Y[i];
+    if (keep) burst.trajs.push({ y0: NOZ_Y[i], pts: tr, idx: i });
+    if (k === (ns >> 1)) burst.flightTime = r.t;
+  }
+
+  // 沿陣列內插到全部 300 個噴嘴
+  let seg = 0;
+  for (let i = 0; i < n; i++) {
+    while (seg < ns - 2 && si[seg + 1] < i) seg++;
+    const i0 = si[seg], i1 = si[seg + 1];
+    const f = i1 > i0 ? (i - i0) / (i1 - i0) : 0;
+    burst.driftX[i] = sx[seg] + f * (sx[seg + 1] - sx[seg]);
+    burst.driftY[i] = sy[seg] + f * (sy[seg + 1] - sy[seg]);
+  }
+}
+
+// =====================================================================
+// 繪圖工具
+// =====================================================================
+function fitCanvas(cv) {
+  const r = window.devicePixelRatio || 1;
+  const w = cv.clientWidth, h = cv.clientHeight || cv.height;
+  if (cv.width !== Math.round(w * r) || cv.height !== Math.round(h * r)) {
+    cv.width = Math.round(w * r); cv.height = Math.round(h * r);
+  }
+  const ctx = cv.getContext("2d");
+  ctx.setTransform(r, 0, 0, r, 0, 0);
+  ctx.clearRect(0, 0, w, h);
+  return { ctx, w, h };
+}
+
+/** viridis 近似色階。 */
+function viridis(t) {
+  t = clamp(t, 0, 1);
+  const r = Math.round(255 * clamp(0.28 + 2.1*t*t*t - 0.55*t, 0, 1));
+  const g = Math.round(255 * clamp(0.02 + 0.95 * t, 0, 1));
+  const b = Math.round(255 * clamp(0.33 + 1.7*t - 2.6*t*t + 0.85*t*t*t, 0, 1));
+  return `rgb(${r},${g},${b})`;
+}
+
+function arrow(ctx, x0, y0, x1, y1, head) {
+  ctx.beginPath(); ctx.moveTo(x0, y0); ctx.lineTo(x1, y1); ctx.stroke();
+  const a = Math.atan2(y1 - y0, x1 - x0);
+  ctx.beginPath(); ctx.moveTo(x1, y1);
+  ctx.lineTo(x1 - head * Math.cos(a - 0.4), y1 - head * Math.sin(a - 0.4));
+  ctx.lineTo(x1 - head * Math.cos(a + 0.4), y1 - head * Math.sin(a + 0.4));
+  ctx.closePath(); ctx.fill();
+}
+
+function axisText(ctx, s, x, y, color, align, size) {
+  ctx.fillStyle = color || "#8b949e";
+  ctx.font = `${size || 10}px system-ui, sans-serif`;
+  ctx.textAlign = align || "left";
+  ctx.fillText(s, x, y);
+}
+
+// =====================================================================
+// 視圖 1：產線總覽（右 → 左）
+// =====================================================================
+function drawLine(st) {
+  const { ctx, w, h } = fitCanvas(document.getElementById("cLine"));
+  const spanM = 2.2;                    // 顯示 2.2 公尺
+  const s = w / spanM;                  // px / m
+  const beltY = h - 22;
+  const boxPx = P.boxLen * s;
+  const boxHpx = Math.min(P.boxH * s, h - 52);
+
+  ctx.fillStyle = "#21262d";
+  ctx.fillRect(0, beltY, w, 7);
+  ctx.strokeStyle = "#30363d"; ctx.lineWidth = 1;
+  const roll = (belt.dist * s) % 26;
+  for (let x = -26; x < w + 26; x += 26) {
+    ctx.beginPath();
+    ctx.moveTo(w - ((x + roll) % (w + 52)) + 26, beltY);
+    ctx.lineTo(w - ((x + roll) % (w + 52)) + 26, beltY + 7);
+    ctx.stroke();
+  }
+
+  // 箱列：噴頭固定在畫面中央，箱子由右至左
+  const headX = w / 2;
+  const u = st.u;
+  for (let k = -2; k <= 3; k++) {
+    const leadOff = u - k * P.pitch;        // 該箱前緣已通過噴頭的距離
+    const leadX = headX - leadOff * s;      // 右→左：已通過 -> 往左
+    const x0 = leadX, x1 = leadX + boxPx;
+    if (x1 < -20 || x0 > w + 20) continue;
+    ctx.fillStyle = "#8a6a3a";
+    ctx.fillRect(x0, beltY - boxHpx, boxPx, boxHpx);
+    ctx.fillStyle = "#a8834a";
+    ctx.fillRect(x0, beltY - boxHpx, boxPx, 5);
+    ctx.strokeStyle = "#c9a06a"; ctx.lineWidth = 1;
+    ctx.strokeRect(x0 + .5, beltY - boxHpx + .5, boxPx - 1, boxHpx - 1);
+  }
+
+  // 噴頭
+  const headTopY = beltY - boxHpx - 20;
+  ctx.fillStyle = "#e6edf3";
+  ctx.fillRect(headX - 13, headTopY, 26, 17);
+  ctx.fillStyle = "#f0883e";
+  ctx.fillRect(headX - 11, headTopY + 17, 22, 3);
+  axisText(ctx, "噴頭（固定）", headX, headTopY - 5, "#e6edf3", "center", 10.5);
+
+  // 觀測區框
+  ctx.strokeStyle = "#e3b341"; ctx.lineWidth = 1.5;
+  ctx.setLineDash([4, 3]);
+  ctx.strokeRect(headX - 34, beltY - boxHpx - 6, 68, 12);
+  ctx.setLineDash([]);
+
+  ctx.fillStyle = "#8b949e";
+  ctx.font = "10.5px system-ui";
+  ctx.textAlign = "left";
+  ctx.fillText(`箱 ${(P.boxLen*100).toFixed(0)}cm · 間距 ${P.spacingCm}cm`, 8, 14);
+  ctx.textAlign = "right";
+  ctx.fillText(`◀ 移動方向 ${(belt.vBox*60).toFixed(0)} m/min`, w - 8, 14);
+}
+
+// =====================================================================
+// 視圖 2：間隙風場 X-Z 側視（需求 5-1）
+// =====================================================================
+function drawGap(st) {
+  const { ctx, w, h } = fitCanvas(document.getElementById("cGap"));
+  const padL = 58, padR = 62, padT = 20, padB = 40;
+  const pw = w - padL - padR, ph = h - padT - padB;
+  const halfX = 0.04;                       // ±40mm
+  const gap = st.gap;
+
+  const X2p = x => padL + (halfX - x) / (2 * halfX) * pw;   // 右→左鏡射
+  const Z2p = z => padT + (1 - z / gap) * ph;
+
+  // 風速色階
+  const NX = 60, NZ = 26;
+  const ref = Math.max(P.beltSpeed, 0.5);
+  for (let i = 0; i < NX; i++) {
+    for (let j = 0; j < NZ; j++) {
+      const x = -halfX + 2 * halfX * (i + .5) / NX;
+      const z = gap * (j + .5) / NZ;
+      wind(x, 0, z, st, _w);
+      const m = Math.hypot(_w[0], _w[1], _w[2]);
+      ctx.fillStyle = viridis(m / ref);
+      const px = X2p(x) - pw / NX / 2 - 1, pz = Z2p(z) - ph / NZ / 2 - 1;
+      ctx.fillRect(px, pz, pw / NX + 2, ph / NZ + 2);
+    }
+  }
+
+  // 風向箭頭
+  ctx.strokeStyle = "rgba(255,255,255,.75)";
+  ctx.fillStyle = "rgba(255,255,255,.75)";
+  ctx.lineWidth = 1;
+  for (let i = 0; i < 13; i++) {
+    for (let j = 1; j < 7; j++) {
+      const x = -halfX + 2 * halfX * (i + .5) / 13;
+      const z = gap * j / 7;
+      wind(x, 0, z, st, _w);
+      const sc = 13 / ref;
+      const dx = -_w[0] * sc, dz = -_w[2] * sc * (ph / gap) / (pw / (2 * halfX));
+      if (Math.hypot(dx, dz) < 1.2) continue;
+      arrow(ctx, X2p(x), Z2p(z), X2p(x) + dx, Z2p(z) + dz, 3.2);
+    }
+  }
+
+  // 壁面
+  ctx.fillStyle = "#f85149"; ctx.fillRect(padL, padT - 4, pw, 4);
+  ctx.fillStyle = "#a8834a"; ctx.fillRect(padL, padT + ph, pw, 4);
+  // 噴嘴板覆蓋範圍
+  ctx.fillStyle = "#e3b341";
+  ctx.fillRect(X2p(K.plateX / 2), padT - 7, (K.plateX / (2 * halfX)) * pw, 3);
+
+  axisText(ctx, "噴嘴板（靜止）", padL + 4, padT - 8, "#f85149", "left", 10);
+  axisText(ctx, `箱頂面 ${(st.uBox*60).toFixed(0)} m/min`, padL + 4, padT + ph + 15, "#a8834a", "left", 10);
+  axisText(ctx, (gap * 1000).toFixed(2) + " mm", padL - 6, padT + 4, "#8b949e", "right", 10);
+  axisText(ctx, "0", padL - 6, padT + ph + 4, "#8b949e", "right", 10);
+  axisText(ctx, "+40mm", padL + 2, h - 6, "#8b949e", "left", 10);
+  axisText(ctx, "-40mm", padL + pw - 2, h - 6, "#8b949e", "right", 10);
+  axisText(ctx, "◀ 箱子前進", padL + pw / 2, padT + ph + 15, "#c9d1d9", "center", 10);
+
+  // 色標
+  const cbX = w - padR + 14, cbW = 12, cbH = ph;
+  for (let i = 0; i < cbH; i++) {
+    ctx.fillStyle = viridis(1 - i / cbH);
+    ctx.fillRect(cbX, padT + i, cbW, 1);
+  }
+  ctx.strokeStyle = "#30363d"; ctx.strokeRect(cbX, padT, cbW, cbH);
+  axisText(ctx, ref.toFixed(1), cbX + cbW + 3, padT + 8, "#8b949e", "left", 9.5);
+  axisText(ctx, "0", cbX + cbW + 3, padT + cbH, "#8b949e", "left", 9.5);
+  axisText(ctx, "m/s", cbX + cbW + 3, padT + cbH / 2, "#8b949e", "left", 9.5);
+}
+
+// =====================================================================
+// 視圖 3：墨滴軌跡（5-2a）
+// =====================================================================
+function drawTraj() {
+  const { ctx, w, h } = fitCanvas(document.getElementById("cTraj"));
+  if (!burst.trajs.length) return;
+  const padT = 16, padB = 24, gap = burst.gap;
+  const ph = h - padT - padB;
+  const half = w / 2;
+
+  let mx = 1e-9, my = 1e-9;
+  for (const tr of burst.trajs) {
+    for (let i = 0; i < tr.pts.length; i += 3) {
+      mx = Math.max(mx, Math.abs(tr.pts[i]));
+      my = Math.max(my, Math.abs(tr.pts[i + 1] - tr.y0));
+    }
+  }
+
+  for (const [k, span, off] of [[0, mx, 0], [1, my, half]]) {
+    const pw = half - 40;
+    const x0 = off + 30;
+    ctx.fillStyle = "#f85149"; ctx.fillRect(x0, padT - 3, pw, 3);
+    ctx.fillStyle = "#a8834a"; ctx.fillRect(x0, padT + ph, pw, 3);
+    for (const tr of burst.trajs) {
+      const frac = tr.idx / (P.nNozzles - 1);
+      ctx.strokeStyle = `hsl(${210 - 210 * frac},72%,62%)`;
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      for (let i = 0; i < tr.pts.length; i += 3) {
+        const v = k === 0 ? tr.pts[i] : tr.pts[i + 1] - tr.y0;
+        const px = k === 0 ? x0 + (v / span) * pw
+                           : x0 + pw / 2 + (v / span) * (pw / 2);
+        const py = padT + (1 - tr.pts[i + 2] / gap) * ph;
+        i === 0 ? ctx.moveTo(px, py) : ctx.lineTo(px, py);
+      }
+      ctx.stroke();
+    }
+    axisText(ctx, k === 0 ? "縱向 X-Z" : "橫向 Y-Z（扇形）",
+             off + half / 2, padT - 6, "#8b949e", "center", 10);
+    axisText(ctx, k === 0 ? `0 → ${(span*1e6).toFixed(0)} µm` : `±${(span*1e6).toFixed(0)} µm`,
+             off + half / 2, h - 8, "#8b949e", "center", 10);
+  }
+  axisText(ctx, (gap * 1000).toFixed(2) + "mm", 26, padT + 4, "#8b949e", "right", 9.5);
+  axisText(ctx, "0", 26, padT + ph + 4, "#8b949e", "right", 9.5);
+}
+
+// =====================================================================
+// 視圖 4：300 噴嘴飄移（5-2b）
+// =====================================================================
+function drawDrift() {
+  const { ctx, w, h } = fitCanvas(document.getElementById("cDrift"));
+  const padL = 44, padR = 14, padT = 18, padB = 26;
+  const pw = w - padL - padR, ph = h - padT - padB;
+  const n = P.nNozzles;
+
+  let mDy = 1e-12, mDx = 1e-12;
+  for (let i = 0; i < n; i++) {
+    mDy = Math.max(mDy, Math.abs(burst.driftY[i]));
+    mDx = Math.max(mDx, burst.driftX[i]);
+  }
+  const scale = Math.max(mDy, mDx * 0.06);
+
+  ctx.strokeStyle = "#30363d"; ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.moveTo(padL, padT + ph / 2); ctx.lineTo(padL + pw, padT + ph / 2); ctx.stroke();
+  ctx.setLineDash([3, 3]);
+  ctx.beginPath(); ctx.moveTo(padL + pw / 2, padT); ctx.lineTo(padL + pw / 2, padT + ph); ctx.stroke();
+  ctx.setLineDash([]);
+
+  // Δy：外八
+  ctx.strokeStyle = "#d2a8ff"; ctx.lineWidth = 2;
+  ctx.beginPath();
+  for (let i = 0; i < n; i++) {
+    const px = padL + (i / (n - 1)) * pw;
+    const py = padT + ph / 2 - (burst.driftY[i] / scale) * (ph / 2) * 0.88;
+    i === 0 ? ctx.moveTo(px, py) : ctx.lineTo(px, py);
+  }
+  ctx.stroke();
+
+  // Δx（縮小 20 倍以便同框比較）
+  ctx.strokeStyle = "#58a6ff"; ctx.lineWidth = 1.5; ctx.globalAlpha = .8;
+  ctx.beginPath();
+  for (let i = 0; i < n; i++) {
+    const px = padL + (i / (n - 1)) * pw;
+    const py = padT + ph / 2 - (burst.driftX[i] / 20 / scale) * (ph / 2) * 0.88;
+    i === 0 ? ctx.moveTo(px, py) : ctx.lineTo(px, py);
+  }
+  ctx.stroke(); ctx.globalAlpha = 1;
+
+  const su = scale * 1e6;
+  const lab = su >= 10 ? su.toFixed(0) : su >= 1 ? su.toFixed(1) : su.toFixed(3);
+  axisText(ctx, `+${lab}`, padL - 5, padT + ph*0.08, "#8b949e", "right", 9.5);
+  axisText(ctx, "0 µm", padL - 5, padT + ph / 2 + 4, "#8b949e", "right", 9.5);
+  axisText(ctx, `-${lab}`, padL - 5, padT + ph*0.96, "#8b949e", "right", 9.5);
+  axisText(ctx, "1", padL, h - 8, "#8b949e", "center", 9.5);
+  axisText(ctx, "150", padL + pw / 2, h - 8, "#8b949e", "center", 9.5);
+  axisText(ctx, "300", padL + pw, h - 8, "#8b949e", "center", 9.5);
+  axisText(ctx, "噴嘴編號", padL + pw / 2, padT - 6, "#8b949e", "center", 10);
+  axisText(ctx, "■ Δy 橫向", padL + 4, padT + 10, "#d2a8ff", "left", 10);
+  axisText(ctx, "■ Δx 縱向 ÷20", padL + 74, padT + 10, "#58a6ff", "left", 10);
+}
+
+// =====================================================================
+// 視圖 5：間隙風速時間序列（5-1c）
+// =====================================================================
+const series = { v: [], conf: [], cap: 320 };
+function pushSeries(mean, conf) {
+  series.v.push(mean); series.conf.push(conf);
+  if (series.v.length > series.cap) { series.v.shift(); series.conf.shift(); }
+}
+function drawSeries() {
+  const { ctx, w, h } = fitCanvas(document.getElementById("cSeries"));
+  const padL = 40, padT = 12, padB = 20;
+  const pw = w - padL - 12, ph = h - padT - padB;
+  const n = series.v.length;
+  if (n < 2) return;
+  const mx = Math.max(0.5, ...series.v) * 1.12;
+
+  for (let i = 0; i < n; i++) {
+    ctx.fillStyle = series.conf[i] > 0.5 ? "rgba(63,185,80,.10)" : "rgba(248,81,73,.10)";
+    ctx.fillRect(padL + (i / series.cap) * pw, padT, pw / series.cap + 1, ph);
+  }
+  ctx.strokeStyle = "#58a6ff"; ctx.lineWidth = 1.8;
+  ctx.beginPath();
+  for (let i = 0; i < n; i++) {
+    const px = padL + (i / series.cap) * pw;
+    const py = padT + (1 - series.v[i] / mx) * ph;
+    i === 0 ? ctx.moveTo(px, py) : ctx.lineTo(px, py);
+  }
+  ctx.stroke();
+
+  const half = P.beltSpeed / 2;
+  ctx.strokeStyle = "rgba(88,166,255,.45)"; ctx.setLineDash([4, 3]); ctx.lineWidth = 1;
+  const yh = padT + (1 - half / mx) * ph;
+  ctx.beginPath(); ctx.moveTo(padL, yh); ctx.lineTo(padL + pw, yh); ctx.stroke();
+  ctx.setLineDash([]);
+  axisText(ctx, `穩態 U/2 = ${half.toFixed(2)}`, padL + pw - 4, yh - 4, "#58a6ff", "right", 9.5);
+  axisText(ctx, mx.toFixed(1), padL - 5, padT + 8, "#8b949e", "right", 9.5);
+  axisText(ctx, "0 m/s", padL - 5, padT + ph, "#8b949e", "right", 9.5);
+  axisText(ctx, "← 較舊", padL + 4, h - 6, "#8b949e", "left", 9.5);
+  axisText(ctx, "現在 →", padL + pw - 4, h - 6, "#8b949e", "right", 9.5);
+}
+
+// =====================================================================
+// 數值面板
+// =====================================================================
+function updateReadout() {
+  const q = id => document.getElementById(id);
+  const st = burst.st, stats = burst.stats;
+  if (!st) return;
+  const under = st.conf > 0.5;
+  const nearLead = st.u < 0.05 || st.u > P.pitch - 0.05;
+  const ph = q("rPhase");
+  if (!belt.running && belt.vBox < 1e-3) {
+    ph.textContent = "產線停止"; ph.style.background = "#30363d"; ph.style.color = "#8b949e";
+  } else if (nearLead && !under) {
+    ph.textContent = "前緣撞擊"; ph.style.background = "#7d4e13"; ph.style.color = "#f0883e";
+  } else if (under) {
+    ph.textContent = "拘束間隙"; ph.style.background = "#1f6f3f"; ph.style.color = "#7ee787";
+  } else {
+    ph.textContent = "箱間開放區"; ph.style.background = "#6e2b28"; ph.style.color = "#ffa198";
+  }
+
+  // 取「絕對值最大」而非 max()：箱間開放區的尾流是逆向流，Δx 為負，
+  // 用 max() 會把它讀成 0 而與合成飄移矛盾。
+  let exDx = 0, mMag = 0, edgeDy = 0;
+  for (let i = 0; i < P.nNozzles; i++) {
+    if (Math.abs(burst.driftX[i]) > Math.abs(exDx)) exDx = burst.driftX[i];
+    mMag = Math.max(mMag, Math.hypot(burst.driftX[i], burst.driftY[i]));
+    edgeDy = Math.max(edgeDy, Math.abs(burst.driftY[i]));
+  }
+  const ang = Math.atan2(edgeDy, Math.max(Math.abs(exDx), 1e-12)) * 180 / Math.PI;
+
+  q("rMean").textContent = stats.mean.toFixed(2) + " m/s";
+  q("rMax").textContent = stats.max.toFixed(2) + " m/s";
+  q("rGap").textContent = (st.gap * 1000).toFixed(3) + " mm";
+  q("rFlight").textContent = (burst.flightTime * 1e3).toFixed(3) + " ms";
+  q("rDx").textContent = (exDx * 1e6).toFixed(1) + " µm";
+  q("rDy").textContent = "±" + (edgeDy * 1e6).toFixed(1) + " µm";
+  q("rMag").textContent = (mMag * 1e6).toFixed(1) + " µm";
+  q("rDot").textContent = (mMag / P.nozzlePitch).toFixed(2) + " 個點距";
+  q("rAng").textContent = "±" + ang.toFixed(1) + "°";
+  q("rFreq").textContent = P.cycleHz > 0 ? P.cycleHz.toFixed(2) + " Hz" : "—";
+  q("rStk").textContent = (P.tau / Math.max(burst.flightTime, 1e-9)).toFixed(1);
+
+  const need = P.beltSpeed / P.nozzlePitch;
+  const xdpi = P.beltSpeed > 0 ? INCH / (P.beltSpeed / P.fireHz) : 0;
+  q("noteX").innerHTML =
+    `次要診斷：X 向解析度 <b>${xdpi.toFixed(0)} dpi</b>（@15kHz），` +
+    `Y 向 <b>${P.dpi.toFixed(0)} dpi</b>。要讓 X 向追平需 ` +
+    `<b>${(need / 1000).toFixed(1)} kHz</b>，超出 TIJ 的 12~15 kHz 上限。` +
+    `此項造成「字被拉長」，與風場造成的「字歪斜／邊緣模糊」是不同來源。`;
+}
+
+// =====================================================================
+// 主迴圈
+// =====================================================================
+let last = performance.now(), sinceBurst = 1e9;
+
+function frame(now) {
+  const real = Math.min((now - last) / 1000, 0.05);
+  last = now;
+  const scale = 1 / Number(document.getElementById("slow").value);
+
+  // 以較小的子步進積分皮帶，避免慢動作下相位跳動
+  const dt = real * scale;
+  const sub = 4;
+  for (let i = 0; i < sub; i++) beltStep(dt / sub);
+
+  const st = beltState();
+
+  sinceBurst += real;
+  if (sinceBurst > 0.12) { fireBurst(st); sinceBurst = 0; }
+  const stats = burst.stats;
+
+  drawLine(st);
+  drawGap(st);
+  drawTraj();
+  drawDrift();
+  pushSeries(stats.mean, st.conf);
+  drawSeries();
+  updateReadout();
+
+  requestAnimationFrame(frame);
+}
+
+// =====================================================================
+// 控制項綁定
+// =====================================================================
+function bind(id, key, fmt, transform) {
+  const el = document.getElementById(id);
+  const out = document.getElementById("v" + id[0].toUpperCase() + id.slice(1));
+  const apply = () => {
+    const raw = Number(el.value);
+    P[key] = transform ? transform(raw) : raw;
+    if (out) out.textContent = fmt(P[key], raw);
+    rebuildNozzles();
+    sinceBurst = 1e9;
+  };
+  el.addEventListener("input", apply);
+  apply();
+}
+
+bind("speed", "speedMMin", v => v.toFixed(0) + " m/min");
+bind("mass", "mass", v => v.toFixed(0) + " kg");
+bind("spacing", "spacingCm", v => v.toFixed(0) + " cm");
+bind("gap", "gapMm", v => v.toFixed(1) + " mm");
+bind("vol", "dropletPl", v => `${v.toFixed(0)} pL（⌀${(P.dropDiameter*1e6).toFixed(1)}µm）`);
+bind("eject", "eject", v => v.toFixed(1) + " m/s");
+bind("ph", "printHeightIn",
+     v => `${v === 1 ? "1" : "1/2"} 吋（${P.dpi.toFixed(0)} dpi・${(P.nozzlePitch*1e6).toFixed(1)}µm）`,
+     raw => raw === 1 ? 1.0 : 0.5);
+
+document.getElementById("vSlow").textContent = "1/25 倍速";
+document.getElementById("slow").addEventListener("input", e => {
+  document.getElementById("vSlow").textContent = `1/${e.target.value} 倍速`;
+});
+
+const runBtn = document.getElementById("run");
+runBtn.addEventListener("click", () => {
+  belt.running = !belt.running;
+  runBtn.textContent = belt.running ? "⏸ 停止" : "▶ 開始";
+  runBtn.className = belt.running ? "stop" : "run";
+});
+document.getElementById("reset").addEventListener("click", () => {
+  belt.running = false; belt.vBelt = 0; belt.vBox = 0; belt.dist = 0; belt.simTime = 0;
+  series.v.length = 0; series.conf.length = 0;
+  runBtn.textContent = "▶ 開始"; runBtn.className = "run";
+  sinceBurst = 1e9;
+});
+
+rebuildNozzles();
+requestAnimationFrame(frame);
+</script>
