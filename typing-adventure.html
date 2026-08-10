@@ -1,0 +1,1189 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>打字大冒險：英文與注音打怪練習</title>
+<style>
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  padding: 0;
+  min-height: 100%;
+  font-family: "Segoe UI", "Microsoft JhengHei", "PingFang TC", "Noto Sans TC", sans-serif;
+  color: #2d2540;
+  overflow-x: hidden;
+}
+
+body {
+  background: linear-gradient(160deg, #ffe8b8 0%, #ffd1e6 45%, #c9e6ff 100%);
+  min-height: 100vh;
+}
+
+button {
+  font-family: inherit;
+  cursor: pointer;
+  border: none;
+}
+
+#app {
+  max-width: 900px;
+  margin: 0 auto;
+  padding: 16px 16px 40px;
+  position: relative;
+  min-height: 100vh;
+}
+
+.screen { display: none; }
+.screen.active { display: block; animation: fadeIn 0.35s ease; }
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* ---------------- 標題畫面 ---------------- */
+#screen-title {
+  text-align: center;
+  padding-top: 6vh;
+  position: relative;
+}
+
+.title-mascot {
+  font-size: 4.5rem;
+  filter: drop-shadow(0 6px 10px rgba(0,0,0,0.15));
+  animation: bob 2.4s ease-in-out infinite;
+}
+
+@keyframes bob {
+  0%, 100% { transform: translateY(0) rotate(-3deg); }
+  50% { transform: translateY(-12px) rotate(3deg); }
+}
+
+.game-title {
+  font-size: 3rem;
+  margin: 8px 0 0;
+  color: #6b3fa0;
+  text-shadow: 3px 3px 0 #fff, 5px 5px 0 rgba(107,63,160,0.25);
+  letter-spacing: 2px;
+}
+
+.game-subtitle {
+  font-size: 1.2rem;
+  color: #7a5c9e;
+  margin: 6px 0 32px;
+  font-weight: bold;
+}
+
+.title-buttons {
+  display: flex;
+  gap: 20px;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+
+.mode-card {
+  width: 240px;
+  background: #fff;
+  border-radius: 24px;
+  padding: 24px 18px;
+  box-shadow: 0 8px 0 rgba(0,0,0,0.12), 0 10px 20px rgba(0,0,0,0.08);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+.mode-card:hover { transform: translateY(-4px) scale(1.03); }
+.mode-card:active { transform: translateY(2px); box-shadow: 0 4px 0 rgba(0,0,0,0.12); }
+
+.mode-emoji { font-size: 2.6rem; }
+.mode-name { font-size: 1.3rem; font-weight: 800; color: #6b3fa0; }
+.mode-desc { font-size: 0.85rem; color: #8a7aa3; }
+
+.link-btn {
+  background: none;
+  color: #8a7aa3;
+  text-decoration: underline;
+  font-size: 0.85rem;
+  margin-top: 28px;
+  padding: 6px;
+}
+
+.floaty {
+  position: absolute;
+  font-size: 2rem;
+  opacity: 0.7;
+  animation: float 6s ease-in-out infinite;
+  animation-delay: var(--d, 0s);
+}
+.floaty:nth-child(1) { top: 6%; left: 8%; }
+.floaty:nth-child(2) { top: 14%; right: 10%; }
+.floaty:nth-child(3) { top: 40%; left: 4%; }
+@keyframes float {
+  0%, 100% { transform: translateY(0) rotate(0deg); }
+  50% { transform: translateY(-18px) rotate(15deg); }
+}
+
+/* ---------------- 共用 topbar ---------------- */
+.topbar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+.topbar h2 { flex: 1; text-align: center; margin: 0; color: #6b3fa0; }
+.topbar-spacer { width: 70px; }
+
+.icon-btn {
+  background: #fff;
+  border-radius: 14px;
+  padding: 8px 14px;
+  font-weight: bold;
+  color: #6b3fa0;
+  box-shadow: 0 3px 0 rgba(0,0,0,0.12);
+}
+.icon-btn:active { transform: translateY(2px); box-shadow: none; }
+
+/* ---------------- 地圖畫面 ---------------- */
+.tier-section {
+  border-radius: 22px;
+  padding: 16px;
+  margin-bottom: 18px;
+  box-shadow: 0 6px 14px rgba(0,0,0,0.08);
+}
+.theme-meadow { background: linear-gradient(135deg, #d4f5c1, #a9e396); }
+.theme-cave { background: linear-gradient(135deg, #cfd6f7, #9aa3e0); }
+.theme-volcano { background: linear-gradient(135deg, #ffc9a8, #ff8f6b); }
+.tier-section.locked { filter: grayscale(0.8); opacity: 0.6; }
+
+.tier-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-weight: 800;
+  color: #3c2a52;
+  margin-bottom: 10px;
+  font-size: 1.05rem;
+}
+
+.level-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.level-node {
+  background: #fff;
+  border-radius: 16px;
+  padding: 10px 8px;
+  width: 92px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  box-shadow: 0 4px 0 rgba(0,0,0,0.12);
+  transition: transform 0.12s ease;
+}
+.level-node:not(.locked):hover { transform: translateY(-3px); }
+.level-node:not(.locked):active { transform: translateY(2px); box-shadow: none; }
+.level-node-icon { font-size: 1.8rem; }
+.level-node-label { font-size: 0.78rem; font-weight: bold; color: #5b4a75; }
+.level-node-stars { font-size: 0.9rem; color: #e0a500; }
+.level-node.locked { opacity: 0.55; cursor: not-allowed; }
+.level-node.boss { background: linear-gradient(160deg, #fff2c9, #ffd25a); border: 2px solid #e0a500; }
+
+.shake { animation: shake 0.35s; }
+@keyframes shake {
+  0%, 100% { transform: translateX(0); }
+  25% { transform: translateX(-6px); }
+  75% { transform: translateX(6px); }
+}
+
+/* ---------------- 戰鬥畫面 ---------------- */
+#battle-arena {
+  background: rgba(255,255,255,0.55);
+  border-radius: 24px;
+  padding: 18px;
+  text-align: center;
+  margin-bottom: 14px;
+  position: relative;
+}
+#battle-arena.boss-fight {
+  background: linear-gradient(160deg, rgba(255,214,150,0.7), rgba(255,140,110,0.6));
+  box-shadow: 0 0 0 3px #e0a500 inset;
+}
+
+#monster-wrap { margin-bottom: 10px; }
+#monster-emoji {
+  font-size: 5rem;
+  display: inline-block;
+  filter: drop-shadow(0 8px 8px rgba(0,0,0,0.2));
+  animation: idle 2.6s ease-in-out infinite;
+}
+.boss-fight #monster-emoji { font-size: 6.5rem; }
+@keyframes idle {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-8px); }
+}
+#monster-emoji.hit { animation: hitshake 0.3s; }
+@keyframes hitshake {
+  0%, 100% { transform: translateX(0) scale(1); }
+  30% { transform: translateX(-10px) scale(0.95); }
+  60% { transform: translateX(10px) scale(1.05); }
+}
+
+.hp-bar {
+  width: 220px;
+  height: 14px;
+  background: #e2d8f0;
+  border-radius: 8px;
+  margin: 8px auto 0;
+  overflow: hidden;
+  box-shadow: inset 0 2px 3px rgba(0,0,0,0.15);
+}
+#monster-hpbar-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #ff6b6b, #ff9d5c);
+  width: 100%;
+  transition: width 0.35s ease;
+}
+
+#timer-bar-wrap {
+  width: 260px;
+  height: 10px;
+  background: #dcd2ec;
+  border-radius: 6px;
+  margin: 4px auto 14px;
+  overflow: hidden;
+}
+#timer-bar-fill {
+  height: 100%;
+  width: 100%;
+  background: linear-gradient(90deg, #5cd6b0, #4fb3ff);
+  transition: width 0.05s linear;
+}
+#timer-bar-fill.urgent { background: linear-gradient(90deg, #ff6b6b, #ff3b3b); }
+
+#hanzi-hint {
+  font-size: 1.1rem;
+  color: #6b3fa0;
+  font-weight: bold;
+  min-height: 1.4em;
+}
+
+#prompt-display {
+  font-size: 2.6rem;
+  font-weight: 800;
+  letter-spacing: 6px;
+  color: #3c2a52;
+  min-height: 1.4em;
+}
+#prompt-display .ch { opacity: 0.45; }
+#prompt-display .ch.done { color: #45c07a; opacity: 1; }
+#prompt-display .ch.next {
+  opacity: 1;
+  color: #ff7a3d;
+  text-decoration: underline;
+  text-underline-offset: 6px;
+}
+
+#feedback-popup {
+  position: absolute;
+  top: 8px;
+  left: 50%;
+  transform: translateX(-50%) scale(0.7);
+  font-size: 1.3rem;
+  font-weight: 800;
+  color: #45c07a;
+  opacity: 0;
+  pointer-events: none;
+  transition: none;
+}
+#feedback-popup.show {
+  opacity: 1;
+  transform: translateX(-50%) scale(1);
+  transition: transform 0.25s ease, opacity 0.25s ease;
+}
+#feedback-popup.warn { color: #e0763c; }
+
+/* ---------------- 虛擬鍵盤 ---------------- */
+#vkeyboard {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 10px 4px 4px;
+  max-width: 100%;
+  overflow-x: auto;
+}
+.kb-row { display: flex; gap: 5px; }
+.kb-key {
+  min-width: 34px;
+  height: 44px;
+  background: #fff;
+  border-radius: 8px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 3px 0 rgba(0,0,0,0.15);
+  font-weight: 700;
+  color: #4a3c60;
+  line-height: 1;
+  transition: transform 0.08s ease, background 0.15s ease;
+  cursor: pointer;
+  touch-action: manipulation;
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  user-select: none;
+}
+.kb-key:active { transform: translateY(2px) scale(0.94); }
+.kb-key-main { font-size: 1rem; }
+.kb-key-sub { font-size: 0.55rem; color: #a99bc0; margin-top: 2px; }
+.kb-key.kb-tone .kb-key-main { color: #c05fd6; }
+.kb-key.kb-space { width: 260px; }
+
+.kb-key.correct { background: #7ee2a8; }
+.kb-key.wrong { background: #ff8f8f; }
+
+#vkeyboard.mode-zhuyin .kb-key { min-width: 40px; }
+
+/* ---------------- 結算畫面 ---------------- */
+#screen-result { text-align: center; padding-top: 8vh; }
+#result-monster { font-size: 4rem; margin-bottom: 6px; }
+#result-title { color: #6b3fa0; }
+#result-stars { font-size: 2.6rem; color: #e0a500; margin: 6px 0; }
+#result-stats { color: #7a5c9e; font-weight: bold; margin-bottom: 24px; }
+
+.result-buttons {
+  display: flex;
+  gap: 16px;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+
+.big-btn {
+  padding: 14px 26px;
+  border-radius: 18px;
+  font-size: 1.05rem;
+  font-weight: 800;
+  box-shadow: 0 5px 0 rgba(0,0,0,0.15);
+}
+.big-btn:active { transform: translateY(3px); box-shadow: none; }
+.big-btn.primary { background: linear-gradient(160deg, #8ee6b0, #45c07a); color: #fff; }
+.big-btn.secondary { background: #fff; color: #6b3fa0; }
+
+#btn-to-map {
+  display: block;
+  margin: 22px auto 0;
+}
+
+@media (max-width: 480px) {
+  .game-title { font-size: 2.2rem; }
+  #prompt-display { font-size: 1.9rem; letter-spacing: 3px; }
+  .kb-row { gap: 3px; }
+  .kb-key { min-width: 30px; height: 40px; }
+  .kb-key-main { font-size: 0.85rem; }
+  .kb-key.kb-space { width: 180px; }
+}
+</style>
+</head>
+<body>
+<div id="app">
+
+  <!-- 標題畫面 -->
+  <section id="screen-title" class="screen active">
+    <div class="floaty" style="--d:0s">⭐</div>
+    <div class="floaty" style="--d:1.2s">✨</div>
+    <div class="floaty" style="--d:2.1s">⭐</div>
+    <div class="title-mascot">🗡️🐲</div>
+    <h1 class="game-title">打字大冒險</h1>
+    <p class="game-subtitle">英文 &amp; 注音打怪練習</p>
+    <div class="title-buttons">
+      <button class="mode-card" id="btn-mode-english">
+        <span class="mode-emoji">🔤</span>
+        <span class="mode-name">英文打怪</span>
+        <span class="mode-desc">打出正確英文單字，擊敗怪物！</span>
+      </button>
+      <button class="mode-card" id="btn-mode-zhuyin">
+        <span class="mode-emoji">ㄅㄆㄇ</span>
+        <span class="mode-name">注音打字大冒險</span>
+        <span class="mode-desc">用真實鍵盤打出注音符號！</span>
+      </button>
+    </div>
+    <button id="btn-reset-progress" class="link-btn">重置遊戲進度</button>
+  </section>
+
+  <!-- 地圖畫面 -->
+  <section id="screen-map" class="screen">
+    <div class="topbar">
+      <button class="icon-btn" id="map-back">⬅ 返回</button>
+      <h2 id="map-title">關卡地圖</h2>
+      <span class="topbar-spacer"></span>
+    </div>
+    <div id="map-tiers"></div>
+  </section>
+
+  <!-- 戰鬥畫面 -->
+  <section id="screen-battle" class="screen">
+    <div class="topbar">
+      <button class="icon-btn" id="battle-back">⬅ 離開</button>
+      <h2 id="battle-level-title">第 1 關</h2>
+      <span class="topbar-spacer"></span>
+    </div>
+
+    <div id="battle-arena">
+      <div id="monster-wrap">
+        <div id="monster-emoji">🐛</div>
+        <div class="hp-bar"><div id="monster-hpbar-fill"></div></div>
+      </div>
+
+      <div id="timer-bar-wrap"><div id="timer-bar-fill"></div></div>
+
+      <div id="hanzi-hint"></div>
+      <div id="prompt-display"></div>
+
+      <div id="feedback-popup"></div>
+    </div>
+
+    <div id="vkeyboard"></div>
+  </section>
+
+  <!-- 結算畫面 -->
+  <section id="screen-result" class="screen">
+    <div id="result-monster">🎉</div>
+    <h2 id="result-title">怪物被擊敗了！</h2>
+    <div id="result-stars">★★★</div>
+    <p id="result-stats"></p>
+    <div class="result-buttons">
+      <button class="big-btn secondary" id="btn-retry">🔁 再玩一次</button>
+      <button class="big-btn primary" id="btn-next">➡ 下一關</button>
+    </div>
+    <button class="link-btn" id="btn-to-map">回關卡地圖</button>
+  </section>
+
+</div>
+
+<script>
+// ============================================================
+// js/zhuyinMap.js — 標準「大千式」注音鍵盤對照表
+// ============================================================
+// 以實體鍵位 event.code 對應注音符號，不依賴系統是否安裝注音輸入法。
+// 對照來源：維基百科「注音輸入法」條目之大千鍵盤表，並以聲母/介母韻母的
+// 分組排列規則交叉驗證（每一組符號依序垂直填入 數字列→QWERTY列→ASDF列→ZXCV列）。
+
+const KEY_ROWS = [
+  ['Digit1', 'Digit2', 'Digit3', 'Digit4', 'Digit5', 'Digit6', 'Digit7', 'Digit8', 'Digit9', 'Digit0', 'Minus'],
+  ['KeyQ', 'KeyW', 'KeyE', 'KeyR', 'KeyT', 'KeyY', 'KeyU', 'KeyI', 'KeyO', 'KeyP'],
+  ['KeyA', 'KeyS', 'KeyD', 'KeyF', 'KeyG', 'KeyH', 'KeyJ', 'KeyK', 'KeyL', 'Semicolon'],
+  ['KeyZ', 'KeyX', 'KeyC', 'KeyV', 'KeyB', 'KeyN', 'KeyM', 'Comma', 'Period', 'Slash']
+];
+
+const ZHUYIN_MAP = {
+  Digit1: 'ㄅ', Digit2: 'ㄉ', Digit3: 'ˇ', Digit4: 'ˋ', Digit5: 'ㄓ',
+  Digit6: 'ˊ', Digit7: '˙', Digit8: 'ㄚ', Digit9: 'ㄞ', Digit0: 'ㄢ', Minus: 'ㄦ',
+
+  KeyQ: 'ㄆ', KeyW: 'ㄊ', KeyE: 'ㄍ', KeyR: 'ㄐ', KeyT: 'ㄔ',
+  KeyY: 'ㄗ', KeyU: 'ㄧ', KeyI: 'ㄛ', KeyO: 'ㄟ', KeyP: 'ㄣ',
+
+  KeyA: 'ㄇ', KeyS: 'ㄋ', KeyD: 'ㄎ', KeyF: 'ㄑ', KeyG: 'ㄕ',
+  KeyH: 'ㄘ', KeyJ: 'ㄨ', KeyK: 'ㄜ', KeyL: 'ㄠ', Semicolon: 'ㄤ',
+
+  KeyZ: 'ㄈ', KeyX: 'ㄌ', KeyC: 'ㄏ', KeyV: 'ㄒ', KeyB: 'ㄖ',
+  KeyN: 'ㄙ', KeyM: 'ㄩ', Comma: 'ㄝ', Period: 'ㄡ', Slash: 'ㄥ'
+};
+
+// 聲調符號（3、4、6、7 鍵），供區分「聲調」與「注音符號」的顯示樣式
+const TONE_CODES = new Set(['Digit3', 'Digit4', 'Digit6', 'Digit7']);
+
+// 鍵位代碼 -> 鍵面上顯示的英文字母／符號（給英文模式虛擬鍵盤用）
+const KEY_LABELS = {
+  Digit1: '1', Digit2: '2', Digit3: '3', Digit4: '4', Digit5: '5',
+  Digit6: '6', Digit7: '7', Digit8: '8', Digit9: '9', Digit0: '0', Minus: '-',
+  KeyQ: 'Q', KeyW: 'W', KeyE: 'E', KeyR: 'R', KeyT: 'T', KeyY: 'Y', KeyU: 'U', KeyI: 'I', KeyO: 'O', KeyP: 'P',
+  KeyA: 'A', KeyS: 'S', KeyD: 'D', KeyF: 'F', KeyG: 'G', KeyH: 'H', KeyJ: 'J', KeyK: 'K', KeyL: 'L', Semicolon: ';',
+  KeyZ: 'Z', KeyX: 'X', KeyC: 'C', KeyV: 'V', KeyB: 'B', KeyN: 'N', KeyM: 'M', Comma: ',', Period: '.', Slash: '/'
+};
+</script>
+
+<script>
+// ============================================================
+// js/wordLists.js — 關卡內容資料：英文打怪 / 注音打字大冒險
+// ============================================================
+// 每個關卡 items 陣列裡的每一項 = 一次「攻擊」，answer 是需要依序按下的按鍵字元。
+// 初階：turn-based（timed=false，不限時、按錯不扣血）
+// 中高階：timed=true，duration 為每一題的作答秒數（毫秒），關卡越後面時間越短。
+
+function engItem(word) {
+  return { display: word, answer: word.toLowerCase().split('') };
+}
+
+function zhuItem(symbols, hanzi) {
+  return { display: symbols.join(''), hanzi: hanzi || '', answer: symbols };
+}
+
+const WORD_LISTS = {
+  english: {
+    title: '英文打怪',
+    tiers: {
+      beginner: {
+        name: '初階・新手村',
+        theme: 'meadow',
+        monsters: ['🐛', '🐌', '🐝', '🐣', '🐲'],
+        levels: [
+          { title: '第 1 關', timed: false, items: ['cat', 'dog', 'sun', 'red', 'big'].map(engItem) },
+          { title: '第 2 關', timed: false, items: ['pig', 'hat', 'sit', 'run', 'fun'].map(engItem) },
+          { title: '第 3 關', timed: false, items: ['cup', 'box', 'fox', 'hen', 'ant'].map(engItem) },
+          { title: '第 4 關', timed: false, items: ['bee', 'owl', 'bat', 'cow', 'pen'].map(engItem) },
+          { title: '王關・草原之王', boss: true, timed: false, items: ['top', 'hop', 'mud', 'jam', 'wet', 'zoo'].map(engItem) }
+        ]
+      },
+      intermediate: {
+        name: '中階・迷霧洞窟',
+        theme: 'cave',
+        monsters: ['🦇', '🕷️', '🐍', '🦂', '🐺'],
+        levels: [
+          { title: '第 1 關', timed: true, duration: 36000, items: ['apple', 'happy', 'tiger', 'green', 'house'].map(engItem) },
+          { title: '第 2 關', timed: true, duration: 35500, items: ['water', 'candy', 'horse', 'smile', 'cloud'].map(engItem) },
+          { title: '第 3 關', timed: true, duration: 35000, items: ['flower', 'jungle', 'rabbit', 'dragon', 'monkey'].map(engItem) },
+          { title: '第 4 關', timed: true, duration: 34500, items: ['castle', 'wizard', 'planet', 'forest', 'guitar'].map(engItem) },
+          { title: '王關・洞窟霸主', boss: true, timed: true, duration: 34200, items: ['dolphin', 'penguin', 'thunder', 'diamond', 'treasure', 'unicorn'].map(engItem) }
+        ]
+      },
+      advanced: {
+        name: '高階・熔岩火山',
+        theme: 'volcano',
+        monsters: ['🐉', '🦖', '👹', '🐙', '🔥'],
+        levels: [
+          { title: '第 1 關', timed: true, duration: 35200, items: ['elephant', 'mountain', 'sandwich', 'birthday'].map(engItem) },
+          { title: '第 2 關', timed: true, duration: 34800, items: ['butterfly', 'chocolate', 'adventure', 'dinosaur'].map(engItem) },
+          { title: '第 3 關', timed: true, duration: 34400, items: ['astronaut', 'dangerous', 'wonderful', 'fantastic'].map(engItem) },
+          { title: '第 4 關', timed: true, duration: 34000, items: ['good morning', 'see you soon', 'happy birthday', 'thank you'].map(engItem) },
+          { title: '王關・火山霸王', boss: true, timed: true, duration: 33600, items: ['i love you', 'best friend', 'have a nice day', 'never give up', 'good job'].map(engItem) }
+        ]
+      }
+    }
+  },
+
+  zhuyin: {
+    title: '注音打字大冒險',
+    tiers: {
+      beginner: {
+        name: '初階・符號村',
+        theme: 'meadow',
+        monsters: ['🐛', '🐌', '🐝', '🐣', '🐲'],
+        levels: [
+          { title: '第 1 關', timed: false, items: ['ㄅ', 'ㄆ', 'ㄇ', 'ㄈ', 'ㄉ', 'ㄊ', 'ㄋ', 'ㄌ'].map(s => zhuItem([s])) },
+          { title: '第 2 關', timed: false, items: ['ㄍ', 'ㄎ', 'ㄏ', 'ㄐ', 'ㄑ', 'ㄒ', 'ㄓ', 'ㄔ'].map(s => zhuItem([s])) },
+          { title: '第 3 關', timed: false, items: ['ㄕ', 'ㄖ', 'ㄗ', 'ㄘ', 'ㄙ', 'ㄧ', 'ㄨ', 'ㄩ'].map(s => zhuItem([s])) },
+          { title: '第 4 關', timed: false, items: ['ㄚ', 'ㄛ', 'ㄜ', 'ㄝ', 'ㄞ', 'ㄟ', 'ㄠ', 'ㄡ'].map(s => zhuItem([s])) },
+          { title: '王關・符號大魔王', boss: true, timed: false, items: ['ㄢ', 'ㄣ', 'ㄤ', 'ㄥ', 'ㄦ', 'ㄅ', 'ㄐ', 'ㄨ', 'ㄚ', 'ㄣ'].map(s => zhuItem([s])) }
+        ]
+      },
+      intermediate: {
+        name: '中階・拼音洞窟',
+        theme: 'cave',
+        monsters: ['🦇', '🕷️', '🐍', '🦂', '🐺'],
+        levels: [
+          { title: '第 1 關', timed: true, duration: 36500, items: [
+            zhuItem(['ㄅ', 'ㄚ', 'ˋ'], '爸'), zhuItem(['ㄇ', 'ㄚ'], '媽'),
+            zhuItem(['ㄍ', 'ㄡ', 'ˇ'], '狗'), zhuItem(['ㄇ', 'ㄠ'], '貓'), zhuItem(['ㄩ', 'ˊ'], '魚')
+          ] },
+          { title: '第 2 關', timed: true, duration: 36000, items: [
+            zhuItem(['ㄋ', 'ㄧ', 'ˇ'], '你'), zhuItem(['ㄏ', 'ㄠ', 'ˇ'], '好'),
+            zhuItem(['ㄕ', 'ㄨ', 'ˇ'], '鼠'), zhuItem(['ㄏ', 'ㄨ', 'ㄚ'], '花'), zhuItem(['ㄘ', 'ㄠ', 'ˇ'], '草')
+          ] },
+          { title: '第 3 關', timed: true, duration: 35500, items: [
+            zhuItem(['ㄕ', 'ㄨ'], '書'), zhuItem(['ㄅ', 'ㄧ', 'ˇ'], '筆'),
+            zhuItem(['ㄕ', 'ㄢ'], '山'), zhuItem(['ㄏ', 'ㄞ', 'ˇ'], '海'), zhuItem(['ㄒ', 'ㄧ', 'ㄥ'], '星')
+          ] },
+          { title: '第 4 關', timed: true, duration: 35000, items: [
+            zhuItem(['ㄩ', 'ㄝ', 'ˋ'], '月'), zhuItem(['ㄕ', 'ㄨ', 'ㄟ', 'ˇ'], '水'),
+            zhuItem(['ㄏ', 'ㄨ', 'ㄛ', 'ˇ'], '火'), zhuItem(['ㄋ', 'ㄧ', 'ㄠ', 'ˇ'], '鳥'), zhuItem(['ㄒ', 'ㄧ', 'ㄝ', 'ˋ'], '謝')
+          ] },
+          { title: '王關・拼音霸主', boss: true, timed: true, duration: 34500, items: [
+            zhuItem(['ㄕ', 'ㄨ', 'ㄟ', 'ˇ'], '水'), zhuItem(['ㄏ', 'ㄨ', 'ㄛ', 'ˇ'], '火'),
+            zhuItem(['ㄒ', 'ㄧ', 'ㄝ', 'ˋ'], '謝'), zhuItem(['ㄒ', 'ㄧ', 'ㄥ'], '星'),
+            zhuItem(['ㄋ', 'ㄧ', 'ㄠ', 'ˇ'], '鳥'), zhuItem(['ㄏ', 'ㄠ', 'ˇ'], '好')
+          ] }
+        ]
+      },
+      advanced: {
+        name: '高階・詞語火山',
+        theme: 'volcano',
+        monsters: ['🐉', '🦖', '👹', '🐙', '🔥'],
+        levels: [
+          { title: '第 1 關', timed: true, duration: 37500, items: [
+            zhuItem(['ㄋ', 'ㄧ', 'ˇ', 'ㄏ', 'ㄠ', 'ˇ'], '你好'),
+            zhuItem(['ㄒ', 'ㄧ', 'ㄝ', 'ˋ', 'ㄒ', 'ㄧ', 'ㄝ'], '謝謝'),
+            zhuItem(['ㄗ', 'ㄠ', 'ˇ', 'ㄢ'], '早安'),
+            zhuItem(['ㄨ', 'ㄢ', 'ˇ', 'ㄢ'], '晚安')
+          ] },
+          { title: '第 2 關', timed: true, duration: 37000, items: [
+            zhuItem(['ㄌ', 'ㄠ', 'ˇ', 'ㄕ'], '老師'),
+            zhuItem(['ㄊ', 'ㄨ', 'ㄥ', 'ˊ', 'ㄒ', 'ㄩ', 'ㄝ', 'ˊ'], '同學'),
+            zhuItem(['ㄆ', 'ㄥ', 'ˊ', 'ㄧ', 'ㄡ', 'ˇ'], '朋友'),
+            zhuItem(['ㄕ', 'ㄥ', 'ㄖ', 'ˋ'], '生日')
+          ] },
+          { title: '第 3 關', timed: true, duration: 36500, items: [
+            zhuItem(['ㄎ', 'ㄨ', 'ㄞ', 'ˋ', 'ㄌ', 'ㄜ', 'ˋ'], '快樂'),
+            zhuItem(['ㄗ', 'ㄞ', 'ˋ', 'ㄐ', 'ㄧ', 'ㄢ', 'ˋ'], '再見'),
+            zhuItem(['ㄋ', 'ㄧ', 'ˇ', 'ㄏ', 'ㄠ', 'ˇ'], '你好'),
+            zhuItem(['ㄒ', 'ㄧ', 'ㄝ', 'ˋ', 'ㄒ', 'ㄧ', 'ㄝ'], '謝謝')
+          ] },
+          { title: '第 4 關', timed: true, duration: 36000, items: [
+            zhuItem(['ㄗ', 'ㄠ', 'ˇ', 'ㄢ'], '早安'),
+            zhuItem(['ㄨ', 'ㄢ', 'ˇ', 'ㄢ'], '晚安'),
+            zhuItem(['ㄌ', 'ㄠ', 'ˇ', 'ㄕ'], '老師'),
+            zhuItem(['ㄕ', 'ㄥ', 'ㄖ', 'ˋ'], '生日')
+          ] },
+          { title: '王關・詞語霸王', boss: true, timed: true, duration: 35500, items: [
+            zhuItem(['ㄊ', 'ㄨ', 'ㄥ', 'ˊ', 'ㄒ', 'ㄩ', 'ㄝ', 'ˊ'], '同學'),
+            zhuItem(['ㄆ', 'ㄥ', 'ˊ', 'ㄧ', 'ㄡ', 'ˇ'], '朋友'),
+            zhuItem(['ㄎ', 'ㄨ', 'ㄞ', 'ˋ', 'ㄌ', 'ㄜ', 'ˋ'], '快樂'),
+            zhuItem(['ㄗ', 'ㄞ', 'ˋ', 'ㄐ', 'ㄧ', 'ㄢ', 'ˋ'], '再見'),
+            zhuItem(['ㄕ', 'ㄥ', 'ㄖ', 'ˋ'], '生日'),
+            zhuItem(['ㄌ', 'ㄠ', 'ˇ', 'ㄕ'], '老師')
+          ] }
+        ]
+      }
+    }
+  }
+};
+
+const TIER_ORDER = ['beginner', 'intermediate', 'advanced'];
+const TIER_LABELS = { beginner: '初階', intermediate: '中階', advanced: '高階' };
+const THEME_LABELS = { meadow: '🌳 草原', cave: '🕳️ 洞窟', volcano: '🌋 火山' };
+</script>
+
+<script>
+// ============================================================
+// js/audio.js — 用 Web Audio API 即時合成音效，不需要外部音檔
+// ============================================================
+const GameAudio = (() => {
+  let ctx = null;
+
+  function ensureCtx() {
+    if (!ctx) {
+      const AC = window.AudioContext || window.webkitAudioContext;
+      ctx = new AC();
+    }
+    if (ctx.state === 'suspended') ctx.resume();
+    return ctx;
+  }
+
+  function tone(freq, start, duration, type = 'sine', gain = 0.2) {
+    const c = ensureCtx();
+    const osc = c.createOscillator();
+    const g = c.createGain();
+    osc.type = type;
+    osc.frequency.setValueAtTime(freq, c.currentTime + start);
+    g.gain.setValueAtTime(0, c.currentTime + start);
+    g.gain.linearRampToValueAtTime(gain, c.currentTime + start + 0.01);
+    g.gain.exponentialRampToValueAtTime(0.001, c.currentTime + start + duration);
+    osc.connect(g).connect(c.destination);
+    osc.start(c.currentTime + start);
+    osc.stop(c.currentTime + start + duration + 0.02);
+  }
+
+  return {
+    unlock() { ensureCtx(); },
+
+    correctKey() { tone(880, 0, 0.08, 'square', 0.12); },
+
+    wrongKey() { tone(180, 0, 0.12, 'sawtooth', 0.1); },
+
+    hit() {
+      tone(520, 0, 0.09, 'triangle', 0.18);
+      tone(300, 0.05, 0.12, 'triangle', 0.14);
+    },
+
+    timeout() { tone(220, 0, 0.2, 'sawtooth', 0.12); },
+
+    levelClear() {
+      [523, 659, 784, 1047].forEach((f, i) => tone(f, i * 0.11, 0.18, 'triangle', 0.18));
+    },
+
+    monsterDefeated() {
+      [392, 523, 659, 880, 1047].forEach((f, i) => tone(f, i * 0.09, 0.22, 'square', 0.15));
+    },
+
+    click() { tone(660, 0, 0.06, 'square', 0.1); },
+
+    lockedBuzz() { tone(150, 0, 0.15, 'square', 0.08); }
+  };
+})();
+</script>
+
+<script>
+// ============================================================
+// js/storage.js — 進度存讀（localStorage）
+// ============================================================
+// 每個模式（english/zhuyin）、每個階段（beginner/intermediate/advanced）
+// 各關卡的星級。解鎖規則用星級動態算出，不用額外存 unlocked 旗標。
+const Storage = (() => {
+  const KEY = 'typing-adventure-progress-v1';
+
+  function blankTier(len) {
+    return new Array(len).fill(0);
+  }
+
+  function blank() {
+    const data = {};
+    for (const mode of Object.keys(WORD_LISTS)) {
+      data[mode] = {};
+      for (const tier of TIER_ORDER) {
+        data[mode][tier] = blankTier(WORD_LISTS[mode].tiers[tier].levels.length);
+      }
+    }
+    return data;
+  }
+
+  function load() {
+    try {
+      const raw = localStorage.getItem(KEY);
+      if (!raw) return blank();
+      const parsed = JSON.parse(raw);
+      const fresh = blank();
+      for (const mode of Object.keys(fresh)) {
+        for (const tier of TIER_ORDER) {
+          if (parsed[mode] && Array.isArray(parsed[mode][tier])) {
+            const src = parsed[mode][tier];
+            for (let i = 0; i < fresh[mode][tier].length; i++) {
+              if (typeof src[i] === 'number') fresh[mode][tier][i] = src[i];
+            }
+          }
+        }
+      }
+      return fresh;
+    } catch (e) {
+      return blank();
+    }
+  }
+
+  let state = load();
+
+  function save() {
+    localStorage.setItem(KEY, JSON.stringify(state));
+  }
+
+  function getStars(mode, tier, levelIdx) {
+    return state[mode][tier][levelIdx] || 0;
+  }
+
+  function tierStars(mode, tier) {
+    return state[mode][tier].reduce((a, b) => a + b, 0);
+  }
+
+  function isTierCleared(mode, tier) {
+    const stars = state[mode][tier];
+    return stars.length > 0 && stars.every(s => s > 0);
+  }
+
+  function isLevelUnlocked(mode, tier, levelIdx) {
+    if (levelIdx === 0) {
+      const tierPos = TIER_ORDER.indexOf(tier);
+      if (tierPos === 0) return true;
+      return isTierCleared(mode, TIER_ORDER[tierPos - 1]);
+    }
+    return state[mode][tier][levelIdx - 1] > 0;
+  }
+
+  function isTierUnlocked(mode, tier) {
+    return isLevelUnlocked(mode, tier, 0);
+  }
+
+  function recordResult(mode, tier, levelIdx, stars) {
+    const current = state[mode][tier][levelIdx] || 0;
+    if (stars > current) {
+      state[mode][tier][levelIdx] = stars;
+      save();
+    }
+  }
+
+  return { getStars, tierStars, isTierCleared, isLevelUnlocked, isTierUnlocked, recordResult };
+})();
+</script>
+
+<script>
+// ============================================================
+// js/game.js — 核心遊戲邏輯：畫面切換、地圖渲染、戰鬥流程、
+// 虛擬鍵盤與輸入判定（實體鍵盤 + 點擊/觸控皆可）
+// ============================================================
+const Game = (() => {
+  const el = (id) => document.getElementById(id);
+
+  const screens = ['title', 'map', 'battle', 'result'];
+  function showScreen(name) {
+    screens.forEach(s => el('screen-' + s).classList.toggle('active', s === name));
+  }
+
+  // ---- 狀態 ----
+  let mode = null;        // 'english' | 'zhuyin'
+  let tier = null;        // 'beginner' | 'intermediate' | 'advanced'
+  let levelIdx = 0;
+  let level = null;
+  let itemIdx = 0;
+  let charIdx = 0;
+  let monsterHp = 0;
+  let monsterMaxHp = 0;
+  let mistakes = 0;
+  let timeouts = 0;
+  let timerRAF = null;
+  let timerStart = 0;
+  let monsterEmoji = '🐛';
+  let keyElByCode = {};
+  let feedbackTimeout = null;
+  let inputLocked = false;
+
+  const ENCOURAGE = ['太棒了！💪', '答對了！🎉', '好厲害！⭐', '繼續加油！🔥', '你是打字高手！✨'];
+
+  // ---------------- 標題 / 選單 ----------------
+  function goTitle() {
+    mode = null;
+    showScreen('title');
+  }
+
+  function selectMode(m) {
+    GameAudio.unlock();
+    GameAudio.click();
+    mode = m;
+    renderMap();
+    showScreen('map');
+  }
+
+  function resetProgress() {
+    if (confirm('確定要清除所有遊戲進度嗎？這無法復原喔！')) {
+      localStorage.removeItem('typing-adventure-progress-v1');
+      location.reload();
+    }
+  }
+
+  // ---------------- 地圖畫面 ----------------
+  function renderMap() {
+    const data = WORD_LISTS[mode];
+    el('map-title').textContent = data.title;
+    const container = el('map-tiers');
+    container.innerHTML = '';
+    container.className = 'mode-' + mode;
+
+    TIER_ORDER.forEach(t => {
+      const tierData = data.tiers[t];
+      const unlocked = Storage.isTierUnlocked(mode, t);
+      const section = document.createElement('div');
+      section.className = 'tier-section theme-' + tierData.theme + (unlocked ? '' : ' locked');
+
+      const stars = Storage.tierStars(mode, t);
+      const maxStars = tierData.levels.length * 3;
+      section.innerHTML = `
+        <div class="tier-header">
+          <span class="tier-name">${THEME_LABELS[tierData.theme]} ${tierData.name}</span>
+          <span class="tier-stars">${unlocked ? `⭐ ${stars}/${maxStars}` : '🔒 尚未解鎖'}</span>
+        </div>
+        <div class="level-row"></div>
+      `;
+      const row = section.querySelector('.level-row');
+
+      tierData.levels.forEach((lvl, i) => {
+        const lvlUnlocked = unlocked && Storage.isLevelUnlocked(mode, t, i);
+        const lvlStars = Storage.getStars(mode, t, i);
+        const btn = document.createElement('button');
+        btn.className = 'level-node' + (lvl.boss ? ' boss' : '') + (lvlUnlocked ? '' : ' locked');
+        btn.innerHTML = `
+          <span class="level-node-icon">${lvl.boss ? '👑' : (tierData.monsters[i] || '🎯')}</span>
+          <span class="level-node-label">${lvl.boss ? '王關' : ('第 ' + (i + 1) + ' 關')}</span>
+          <span class="level-node-stars">${lvlUnlocked ? starString(lvlStars) : '🔒'}</span>
+        `;
+        btn.addEventListener('click', () => {
+          if (lvlUnlocked) {
+            GameAudio.click();
+            startLevel(t, i);
+          } else {
+            GameAudio.lockedBuzz();
+            btn.classList.add('shake');
+            setTimeout(() => btn.classList.remove('shake'), 400);
+          }
+        });
+        row.appendChild(btn);
+      });
+
+      container.appendChild(section);
+    });
+  }
+
+  function starString(n) {
+    return '★'.repeat(n) + '☆'.repeat(3 - n);
+  }
+
+  // ---------------- 戰鬥畫面 ----------------
+  function startLevel(t, i) {
+    tier = t;
+    levelIdx = i;
+    level = WORD_LISTS[mode].tiers[t].levels[i];
+    monsterMaxHp = level.items.length;
+    monsterHp = monsterMaxHp;
+    mistakes = 0;
+    timeouts = 0;
+    itemIdx = 0;
+    monsterEmoji = WORD_LISTS[mode].tiers[t].monsters[i] || '👾';
+
+    el('battle-level-title').textContent = `${TIER_LABELS[t]}．${level.title}`;
+    el('monster-emoji').textContent = monsterEmoji;
+    document.getElementById('battle-arena').classList.toggle('boss-fight', !!level.boss);
+    updateHpBar();
+
+    buildKeyboard();
+    showScreen('battle');
+    nextItem();
+    window.addEventListener('keydown', onKeyDown);
+  }
+
+  function updateHpBar() {
+    const pct = Math.max(0, (monsterHp / monsterMaxHp) * 100);
+    el('monster-hpbar-fill').style.width = pct + '%';
+  }
+
+  function buildKeyboard() {
+    const kb = el('vkeyboard');
+    kb.innerHTML = '';
+    keyElByCode = {};
+    kb.className = 'mode-' + mode;
+
+    KEY_ROWS.forEach(row => {
+      const rowEl = document.createElement('div');
+      rowEl.className = 'kb-row';
+      row.forEach(code => {
+        const keyEl = document.createElement('div');
+        keyEl.className = 'kb-key';
+        const label = mode === 'zhuyin' ? (ZHUYIN_MAP[code] || '') : KEY_LABELS[code];
+        keyEl.innerHTML = `<span class="kb-key-main">${label}</span>` +
+          (mode === 'zhuyin' ? `<span class="kb-key-sub">${KEY_LABELS[code]}</span>` : '');
+        if (mode === 'zhuyin' && TONE_CODES.has(code)) keyEl.classList.add('kb-tone');
+        keyEl.addEventListener('click', () => tapKey(code));
+        keyElByCode[code] = keyEl;
+        rowEl.appendChild(keyEl);
+      });
+      kb.appendChild(rowEl);
+    });
+
+    if (mode === 'english') {
+      const spaceRow = document.createElement('div');
+      spaceRow.className = 'kb-row';
+      const spaceKey = document.createElement('div');
+      spaceKey.className = 'kb-key kb-space';
+      spaceKey.innerHTML = '<span class="kb-key-main">SPACE</span>';
+      spaceKey.addEventListener('click', () => tapKey('Space'));
+      keyElByCode['Space'] = spaceKey;
+      spaceRow.appendChild(spaceKey);
+      kb.appendChild(spaceRow);
+    }
+  }
+
+  function nextItem() {
+    if (itemIdx >= level.items.length) {
+      levelComplete();
+      return;
+    }
+    charIdx = 0;
+    inputLocked = false;
+    renderPrompt();
+    startTimerIfNeeded();
+  }
+
+  function renderPrompt() {
+    const item = level.items[itemIdx];
+    el('hanzi-hint').textContent = item.hanzi ? `（${item.hanzi}）` : '';
+    const parts = item.answer.map((ch, i) => {
+      const shown = ch === ' ' ? '␣' : ch;
+      if (i < charIdx) return `<span class="ch done">${shown}</span>`;
+      if (i === charIdx) return `<span class="ch next">${shown}</span>`;
+      return `<span class="ch">${shown}</span>`;
+    }).join('');
+    el('prompt-display').innerHTML = parts;
+  }
+
+  function startTimerIfNeeded() {
+    cancelTimer();
+    const bar = el('timer-bar-wrap');
+    if (!level.timed) {
+      bar.style.visibility = 'hidden';
+      return;
+    }
+    bar.style.visibility = 'visible';
+    timerStart = performance.now();
+    const duration = level.duration;
+    const fill = el('timer-bar-fill');
+    function step(now) {
+      const elapsed = now - timerStart;
+      const pct = Math.max(0, 1 - elapsed / duration);
+      fill.style.width = (pct * 100) + '%';
+      fill.classList.toggle('urgent', pct < 0.25);
+      if (elapsed >= duration) {
+        handleTimeout();
+      } else {
+        timerRAF = requestAnimationFrame(step);
+      }
+    }
+    timerRAF = requestAnimationFrame(step);
+  }
+
+  function cancelTimer() {
+    if (timerRAF) cancelAnimationFrame(timerRAF);
+    timerRAF = null;
+  }
+
+  function handleTimeout() {
+    cancelTimer();
+    timeouts++;
+    GameAudio.timeout();
+    showFeedback('時間到，再試一次！⏰', 'warn');
+    charIdx = 0;
+    renderPrompt();
+    startTimerIfNeeded();
+  }
+
+  function showFeedback(text, cls) {
+    const pop = el('feedback-popup');
+    pop.textContent = text;
+    pop.className = 'show ' + (cls || '');
+    if (feedbackTimeout) clearTimeout(feedbackTimeout);
+    feedbackTimeout = setTimeout(() => { pop.className = ''; }, 900);
+  }
+
+  function onKeyDown(e) {
+    if (!el('screen-battle').classList.contains('active')) return;
+    const code = e.code;
+    let pressed;
+    if (mode === 'zhuyin') {
+      pressed = ZHUYIN_MAP[code];
+      if (!pressed) return; // 非注音鍵，忽略
+    } else {
+      if (code === 'Space') pressed = ' ';
+      else if (e.key && e.key.length === 1) pressed = e.key.toLowerCase();
+      else return;
+    }
+    e.preventDefault();
+    handleInput(code, pressed);
+  }
+
+  // 點擊/觸控螢幕虛擬鍵盤時觸發，讓沒有實體鍵盤的手機/平板也能玩
+  function tapKey(code) {
+    if (!el('screen-battle').classList.contains('active')) return;
+    GameAudio.unlock();
+    const pressed = mode === 'zhuyin' ? ZHUYIN_MAP[code] : (code === 'Space' ? ' ' : KEY_LABELS[code].toLowerCase());
+    if (pressed === undefined) return;
+    handleInput(code, pressed);
+  }
+
+  // 供實體鍵盤 keydown 與螢幕虛擬鍵盤點擊/觸控共用的判定邏輯
+  function handleInput(code, pressed) {
+    if (inputLocked) return; // 上一題命中動畫播放中，忽略這段期間的按鍵，避免誤判成打錯
+
+    const expected = level.items[itemIdx].answer[charIdx];
+    const keyEl = keyElByCode[code];
+
+    if (pressed === expected) {
+      GameAudio.correctKey();
+      if (keyEl) {
+        keyEl.classList.add('correct');
+        setTimeout(() => keyEl && keyEl.classList.remove('correct'), 150);
+      }
+      charIdx++;
+      if (charIdx >= level.items[itemIdx].answer.length) {
+        onItemComplete();
+      } else {
+        renderPrompt();
+      }
+    } else {
+      mistakes++;
+      GameAudio.wrongKey();
+      if (keyEl) {
+        keyEl.classList.add('wrong');
+        setTimeout(() => keyEl && keyEl.classList.remove('wrong'), 250);
+      }
+      el('prompt-display').classList.add('shake');
+      setTimeout(() => el('prompt-display').classList.remove('shake'), 300);
+    }
+  }
+
+  function onItemComplete() {
+    cancelTimer();
+    inputLocked = true;
+    GameAudio.hit();
+    monsterHp--;
+    updateHpBar();
+    document.getElementById('monster-emoji').classList.add('hit');
+    setTimeout(() => document.getElementById('monster-emoji').classList.remove('hit'), 300);
+    showFeedback(ENCOURAGE[Math.floor(Math.random() * ENCOURAGE.length)], 'good');
+    itemIdx++;
+    setTimeout(nextItem, 450);
+  }
+
+  function levelComplete() {
+    window.removeEventListener('keydown', onKeyDown);
+    cancelTimer();
+    const totalMisses = mistakes + timeouts;
+    let stars = 1;
+    if (totalMisses === 0) stars = 3;
+    else if (totalMisses <= 3) stars = 2;
+    Storage.recordResult(mode, tier, levelIdx, stars);
+
+    GameAudio.monsterDefeated();
+    el('result-monster').textContent = level.boss ? '👑💥' : '🎉';
+    el('result-title').textContent = level.boss ? '王關怪物被擊敗了！' : '怪物被擊敗了！';
+    el('result-stars').textContent = starString(stars);
+    el('result-stats').textContent = `失誤 ${mistakes} 次・逾時 ${timeouts} 次`;
+
+    const nextBtn = el('btn-next');
+    const hasNext = levelIdx + 1 < WORD_LISTS[mode].tiers[tier].levels.length;
+    nextBtn.style.visibility = hasNext ? 'visible' : 'hidden';
+
+    showScreen('result');
+  }
+
+  function retryLevel() {
+    GameAudio.click();
+    startLevel(tier, levelIdx);
+  }
+
+  function nextLevel() {
+    GameAudio.click();
+    startLevel(tier, levelIdx + 1);
+  }
+
+  function backToMap() {
+    window.removeEventListener('keydown', onKeyDown);
+    cancelTimer();
+    GameAudio.click();
+    renderMap();
+    showScreen('map');
+  }
+
+  function init() {
+    el('btn-mode-english').addEventListener('click', () => selectMode('english'));
+    el('btn-mode-zhuyin').addEventListener('click', () => selectMode('zhuyin'));
+    el('btn-reset-progress').addEventListener('click', resetProgress);
+    el('map-back').addEventListener('click', () => { GameAudio.click(); goTitle(); });
+    el('battle-back').addEventListener('click', backToMap);
+    el('btn-retry').addEventListener('click', retryLevel);
+    el('btn-next').addEventListener('click', nextLevel);
+    el('btn-to-map').addEventListener('click', backToMap);
+    showScreen('title');
+  }
+
+  return { init };
+})();
+</script>
+
+<script>
+// ============================================================
+// js/main.js — 進入點
+// ============================================================
+document.addEventListener('DOMContentLoaded', () => {
+  Game.init();
+});
+</script>
+</body>
+</html>
