@@ -25,6 +25,8 @@ from __future__ import annotations
 import math
 from dataclasses import dataclass, field, replace
 
+from .baffle import BaffleParams
+
 INCH = 0.0254  # m
 
 
@@ -132,6 +134,10 @@ class SimParams:
     bounce_stiffness_n_m: float = 6.16e5
     """皮帶支撐的等效剛度, 決定跳動頻率 f = sqrt(k/m)/2pi。"""
 
+    # --- 導風擋板 / 擾流板 ---
+    baffle: BaffleParams = field(default_factory=BaffleParams)
+    """擋板設計。預設 enabled=False, 此時風場精確退回無擋板的 Couette 解。"""
+
     # --- 物性 ---
     air: AirProps = field(default_factory=AirProps)
     ink: InkProps = field(default_factory=InkProps)
@@ -144,6 +150,7 @@ class SimParams:
         self.validate()
 
     def validate(self) -> None:
+        self.baffle.validate()
         _check("產線速度", self.belt_speed_m_min, 0.0, 350.0, " m/min")
         _check("箱重", self.box_mass_kg, 5.0, 50.0, " kg")
         _check("噴嘴間隙", self.gap_mm, 3.0, 5.0, " mm")
@@ -205,6 +212,17 @@ class SimParams:
     def sigma_edge(self) -> float:
         """前緣脈衝包絡長度 (m)。"""
         return self.sigma_edge_mm / 1000.0
+
+    @property
+    def effective_plate_x(self) -> float:
+        """正對箱面的實體表面在 X 方向的總長度 (m)。
+
+        裝了擋板後, 拘束區從噴嘴板擴大到整組擋板的佔用長度, 因此箱前緣
+        掃過的過渡變得較慢 (拘束因子的過渡寬度變大)。
+        """
+        if self.baffle.active:
+            return max(self.baffle.total_x_footprint, self.plate_x)
+        return self.plate_x
 
     # ------------------------------------------------------------------
     # 衍生量 — 噴嘴陣列

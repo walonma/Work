@@ -180,7 +180,7 @@ class BeltKinematics:
         c=0 表示箱間開放區, 噴頭下方是 50cm 空曠區, Couette 流消失。
         """
         p = self.params
-        w = max(p.plate_x / 2.0, 1e-6)
+        w = max(p.effective_plate_x / 2.0, 1e-6)
         u = self.phase_at(t)
         entering = _smoothstep(u / w)  # 前緣進入
         leaving = _smoothstep((p.box_length_m - u) / w)  # 後緣離開

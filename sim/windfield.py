@@ -29,6 +29,7 @@ from __future__ import annotations
 
 import numpy as np
 
+from .baffle import solve_sealing
 from .belt import BeltKinematics
 from .config import SimParams
 
@@ -75,11 +76,18 @@ class WindField:
         prof_couette = 1.0 - zeta
         prof_pois = 6.0 * zeta * (1.0 - zeta)
 
-        # --- 1. Couette 剪切流 (階段 3 主導) ---
-        ux = conf * u_box * prof_couette
+        # 導風擋板的密封效果。未啟用時 sigma=0、pulse=1, 精確退回原本的解。
+        seal = solve_sealing(p.baffle, gap, p.plate_half_y)
 
-        # --- 2. 前/後緣壓差脈衝 ---
+        # --- 1. Couette 剪切 + 擋板造成的回流 ---
+        # 上下游封閉時質量守恆強制回流, 剖面變成 U(1−ζ) − 3Uσζ(1−ζ)。
+        # σ=1 時淨流量精確為零: 上方 2/3 逆向、下方 1/3 正向, 互相抵消。
+        # 兩端邊界條件不受影響 —— prof_pois 在 z=0 與 z=h 皆為零。
+        ux = conf * u_box * (prof_couette - 0.5 * seal.sigma * prof_pois)
+
+        # --- 2. 前/後緣壓差脈衝 (受擋板阻力衰減) ---
         a_edge, env_lead, env_trail = self._edge_amplitude(x, t, u_box)
+        a_edge = a_edge * seal.pulse_factor
         ux = ux + a_edge * prof_pois
 
         # --- 3. 箱間開放區的尾流回流 ---
@@ -92,8 +100,12 @@ class WindField:
         ux = ux + (1.0 - conf) * wake * prof_couette
 
         # --- 4. 橫向擠壓膜逸流 (產生 300 顆墨滴的差異) ---
-        eta = (y - p.head_y_offset_mm / 1000.0) / p.plate_half_y
-        b_lat = p.c_lateral * a_edge + p.c_lateral_steady * conf * u_box
+        # 擋板比噴印帶寬時, 逸流出口外移 -> 陣列上的橫向梯度變小;
+        # Y 端板則直接以同一套 δ³ 機制抑制逸流。
+        eta = (y - p.head_y_offset_mm / 1000.0) / seal.lateral_half_length
+        b_lat = (p.c_lateral * a_edge + p.c_lateral_steady * conf * u_box) * (
+            1.0 - seal.sigma_y
+        )
         uy = b_lat * np.sign(eta) * np.abs(eta) ** p.p_lateral * prof_pois
 
         # --- 5. 前緣抬升 / 後緣下沉 ---
@@ -154,7 +166,7 @@ class WindField:
         """Y-Z 切面 (5-1b), 跨噴嘴陣列範圍。回傳 (Y, Z, Uy, Uz, Ux)。"""
         p = self.params
         gap = float(np.asarray(self.belt.gap_at(t)).reshape(-1)[0])
-        span = p.plate_half_y * 1.2
+        span = max(p.plate_half_y, p.baffle.half_width if p.baffle.active else 0.0) * 1.2
         ys = np.linspace(-span, span, ny) + p.head_y_offset_mm / 1000.0
         zs = np.linspace(0.0, gap, nz)
         Y, Z = np.meshgrid(ys, zs, indexing="xy")
@@ -179,6 +191,21 @@ class WindField:
         zs = np.linspace(0.0, gap, n)
         ux, uy, uz = self.velocity(0.0, 0.0, zs, t)
         return float(np.mean(np.sqrt(ux**2 + uy**2 + uz**2)))
+
+    def sealing_at(self, t):
+        """回傳 t 時刻的擋板密封求解結果 (供數值面板與報表使用)。"""
+        gap = float(np.asarray(self.belt.gap_at(t)).reshape(-1)[0])
+        return solve_sealing(self.params.baffle, gap, self.params.plate_half_y)
+
+    def net_flux(self, t, n=201):
+        """間隙的淨體積流率 (每單位 Y 寬, m^2/s)。
+
+        零淨流量是擋板密封的物理目標: sigma=1 時此值應為零。
+        """
+        gap = float(np.asarray(self.belt.gap_at(t)).reshape(-1)[0])
+        zs = np.linspace(0.0, gap, n)
+        ux, _, _ = self.velocity(0.0, 0.0, zs, t)
+        return float(np.trapezoid(ux, zs))
 
     def gap_max_speed(self, t, n=41):
         """間隙內 |u| 的最大值 (m/s)。"""

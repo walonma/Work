@@ -20,12 +20,15 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import numpy as np
 
+from .baffle import BaffleParams, check_collision, solve_sealing
 from .belt import BeltKinematics
 from .config import SimParams
 from .simulate import (
+    BaffleClearanceSweep,
     BurstResult,
     CycleScan,
     ParameterSweep,
+    find_zero_drift_clearance,
     fire_burst,
     steady_fire_time,
 )
@@ -38,6 +41,7 @@ plt.rcParams["font.sans-serif"] = [
     "Microsoft JhengHei",
     "DejaVu Sans",
 ]
+plt.rcParams["font.monospace"] = ["WenQuanYi Zen Hei Mono", "DejaVu Sans Mono"]
 plt.rcParams["axes.unicode_minus"] = False
 plt.rcParams["figure.dpi"] = 110
 plt.rcParams["savefig.dpi"] = 140
@@ -518,3 +522,300 @@ def render_baseline(params: SimParams, outdir: Path, t_fire=None) -> list[Path]:
     paths.append(plot_drift_vs_nozzle(burst, outdir))
     paths.append(plot_drift_vectors(burst, outdir))
     return paths
+
+
+# ======================================================================
+# 導風擋板
+# ======================================================================
+def _draw_baffle_stack(ax, b: BaffleParams, gap_mm: float, side: int,
+                       cavity_half_mm: float):
+    """在 X-Z 剖面上畫出單側的串列擋板。side=-1 上游, +1 下游。"""
+    h_mm = gap_mm - b.clearance_mm            # 擋板的垂直高度
+    lean = h_mm * np.tan(b.angle)             # 下緣往外偏移 (斜角導流)
+    l_b = b.constriction_length * 1000.0
+    x = cavity_half_mm
+    for k in range(b.n_stages):
+        # 傾斜的平行四邊形: 上緣在 z=gap, 下緣在 z=clearance 且往外偏 lean
+        top_in, top_out = side * x, side * (x + l_b)
+        bot_in = side * (x + lean)
+        bot_out = side * (x + l_b + lean)
+        ax.fill(
+            [top_in, top_out, bot_out, bot_in],
+            [gap_mm, gap_mm, b.clearance_mm, b.clearance_mm],
+            facecolor="#9467bd", edgecolor="#5b3a86", lw=1.2, zorder=4,
+        )
+        # 前緣圓角 (面向來流的那一角)
+        if b.edge_radius_mm > 0:
+            cx = bot_in if side < 0 else bot_out
+            ax.add_patch(plt.Circle(
+                (cx, b.clearance_mm + b.edge_radius_mm), b.edge_radius_mm,
+                facecolor="#c9a0ff", edgecolor="none", zorder=5))
+        x += l_b + (b.stage_pitch_mm if k < b.n_stages - 1 else 0.0)
+    return x
+
+
+def plot_baffle_preview(params: SimParams, outdir: Path, gap: float | None = None) -> Path:
+    """擋板設計預覽 —— X-Z 與 Y-Z 剖面 + 氣動效果數值。
+
+    這是「預覽」鍵對應的輸出: 先看設計樣式與密封度, 再開始模擬。
+    """
+    b = params.baffle
+    gap_m = params.gap if gap is None else float(gap)
+    gap_mm = gap_m * 1000.0
+    seal = solve_sealing(b, gap_m, params.plate_half_y)
+    belt = BeltKinematics(params)
+    coll = check_collision(b, belt.bounce_amplitude_mm)
+
+    fig = plt.figure(figsize=(13, 6.4))
+    gs = fig.add_gridspec(2, 2, width_ratios=[1.55, 1.0], height_ratios=[1, 1],
+                          hspace=0.42, wspace=0.22)
+    ax_xz = fig.add_subplot(gs[0, 0])
+    ax_yz = fig.add_subplot(gs[1, 0])
+    ax_txt = fig.add_subplot(gs[:, 1])
+    ax_txt.axis("off")
+
+    cavity_half = b.x_extent_mm / 2.0
+
+    # ---------------- X-Z 剖面 ----------------
+    outer = cavity_half
+    if b.active:
+        if b.upstream:
+            outer = max(outer, _draw_baffle_stack(ax_xz, b, gap_mm, -1, cavity_half))
+        if b.downstream:
+            outer = max(outer, _draw_baffle_stack(ax_xz, b, gap_mm, +1, cavity_half))
+    span = outer * 1.35 + 4
+
+    ax_xz.add_patch(plt.Rectangle((-outer, gap_mm), 2 * outer, 1.1,
+                                  facecolor="#d62728", zorder=3))
+    ax_xz.add_patch(plt.Rectangle((-span, -1.1), 2 * span, 1.1,
+                                  facecolor="#a8834a", zorder=3))
+    # 噴嘴帶
+    ax_xz.plot([-params.plate_x_mm / 2, params.plate_x_mm / 2], [gap_mm, gap_mm],
+               color="#e3b341", lw=5, solid_capstyle="butt", zorder=6,
+               label=f"噴嘴板 {params.plate_x_mm:.0f}mm")
+    # 洩壓孔
+    if b.vent_ratio > 0:
+        for xv in np.linspace(-cavity_half * 0.6, cavity_half * 0.6, 4):
+            ax_xz.plot([xv, xv], [gap_mm, gap_mm + 1.1], color="#010409", lw=3,
+                       zorder=7)
+        ax_xz.text(0, gap_mm + 1.6, f"洩壓孔 {b.vent_ratio*100:.0f}%",
+                   ha="center", fontsize=8, color="#8b949e")
+
+    # 尺寸標註 —— 放在內腔的空白處, 避免與幾何或軸標籤重疊
+    x_c = -b.x_extent_mm * 0.30
+    ax_xz.annotate("", xy=(x_c, 0), xytext=(x_c, b.clearance_mm),
+                   arrowprops=dict(arrowstyle="<->", color="#3fb950", lw=1.3))
+    ax_xz.text(x_c + 0.8, b.clearance_mm * 0.55,
+               f"下緣間隙 {b.clearance_mm:.2f}mm",
+               fontsize=8.5, color="#3fb950", ha="left", va="center")
+
+    x_g = b.x_extent_mm * 0.30
+    ax_xz.annotate("", xy=(x_g, 0), xytext=(x_g, gap_mm),
+                   arrowprops=dict(arrowstyle="<->", color="#8b949e", lw=1.1))
+    ax_xz.text(x_g + 1.0, gap_mm * 0.30, f"間隙\n{gap_mm:.2f}mm",
+               fontsize=8.5, color="#8b949e", va="center")
+
+    ax_xz.annotate("", xy=(-cavity_half, gap_mm + 2.4), xytext=(cavity_half, gap_mm + 2.4),
+                   arrowprops=dict(arrowstyle="<->", color="#1f77b4", lw=1.2))
+    ax_xz.text(0, gap_mm + 2.8, f"內腔 {b.x_extent_mm:.0f}mm", fontsize=8.5,
+               color="#1f77b4", ha="center")
+
+    if b.active and b.n_sides >= 2:
+        ax_xz.text(0, gap_mm * 0.68,
+                   f"零淨流量循環區\nσ = {float(seal.sigma):.3f}",
+                   fontsize=8.5, color="#1f77b4", ha="center", va="center",
+                   bbox=dict(boxstyle="round,pad=0.3", fc="white", ec="#1f77b4",
+                             alpha=0.75, lw=0.8))
+
+    ax_xz.set_xlim(-span, span)
+    ax_xz.set_ylim(-1.4, gap_mm + 4.2)
+    ax_xz.set_xlabel("X — 沿產線 (mm)   →氣流被箱面帶動方向")
+    ax_xz.set_ylabel("Z (mm)")
+    ax_xz.set_title(
+        f"X-Z 剖面   厚度 {b.thickness_mm:.2f}mm · 斜角 {b.angle_deg:.0f}° · "
+        f"{b.n_stages} 片串列 @ {b.stage_pitch_mm:.1f}mm · 圓角 R{b.edge_radius_mm:.2f}",
+        fontsize=10)
+    ax_xz.legend(fontsize=8, loc="upper left", framealpha=0.85)
+    ax_xz.set_aspect("equal", adjustable="box")
+
+    # ---------------- Y-Z 剖面 ----------------
+    half_y = b.half_width * 1000.0 if b.active else params.plate_half_y * 1000
+    span_y = half_y * 1.3 + 3
+    ax_yz.add_patch(plt.Rectangle((-half_y, gap_mm), 2 * half_y, 1.1,
+                                  facecolor="#d62728", zorder=3))
+    ax_yz.add_patch(plt.Rectangle((-span_y, -1.1), 2 * span_y, 1.1,
+                                  facecolor="#a8834a", zorder=3))
+    if b.active and b.y_end_plates:
+        l_b = b.constriction_length * 1000.0
+        for sgn in (-1, 1):
+            ax_yz.add_patch(plt.Rectangle(
+                (sgn * half_y - (l_b if sgn > 0 else 0), b.clearance_mm),
+                l_b, gap_mm - b.clearance_mm,
+                facecolor="#9467bd", edgecolor="#5b3a86", lw=1.2, zorder=4))
+    noz = params.print_height * 1000 / 2
+    ax_yz.plot([-noz, noz], [gap_mm, gap_mm], color="#e3b341", lw=5,
+               solid_capstyle="butt", zorder=6,
+               label=f"300 噴嘴 {params.print_height*1000:.1f}mm")
+    ax_yz.set_xlim(-span_y, span_y)
+    ax_yz.set_ylim(-1.4, gap_mm + 3.4)
+    ax_yz.set_xlabel("Y — 噴嘴陣列方向 (mm)")
+    ax_yz.set_ylabel("Z (mm)")
+    ax_yz.set_title(
+        f"Y-Z 剖面   寬度 {b.width_in:.2f} 吋 ({b.width*1000:.1f}mm)"
+        f"{' · 含 Y 端板' if b.active and b.y_end_plates else ' · 無 Y 端板'}",
+        fontsize=10)
+    ax_yz.legend(fontsize=8, loc="upper left", framealpha=0.85)
+    ax_yz.set_aspect("equal", adjustable="box")
+
+    # ---------------- 數值 ----------------
+    colour = {"safe": "#3fb950", "warn": "#f0883e", "collision": "#f85149"}[coll.level]
+    body = design_summary_text(params, gap_m)
+    ax_txt.text(0.0, 1.0, body, fontsize=9.2, va="top", family="monospace",
+                transform=ax_txt.transAxes)
+    ax_txt.text(0.0, 0.055, f"機械餘裕：{coll.message}", fontsize=9,
+                va="bottom", color=colour, transform=ax_txt.transAxes, wrap=True)
+
+    fig.suptitle("擋板設計預覽", fontsize=13, y=0.98)
+    return _save(fig, Path(outdir), "baffle_preview.png")
+
+
+def design_summary_text(params: SimParams, gap: float) -> str:
+    """預覽用的文字摘要 (與 baffle.design_summary 同內容, 方便繪圖取用)。"""
+    from .baffle import design_summary
+
+    return design_summary(params.baffle, gap, params.plate_half_y, params.belt_speed)
+
+
+def plot_baffle_comparison(params: SimParams, outdir: Path) -> Path:
+    """有/無擋板的對照 —— 速度剖面、墨滴軌跡、飄移量。"""
+    from .windfield import WindField
+
+    cases = [
+        ("無擋板", params.replace(baffle=params.baffle.replace(enabled=False)), "#d62728"),
+        ("有擋板", params, "#2ca02c"),
+    ]
+
+    fig, (ax1, ax2, ax3) = plt.subplots(1, 3, figsize=(13.5, 4.8))
+
+    for label, p, colour in cases:
+        belt = BeltKinematics(p)
+        wind = WindField(p, belt)
+        t = steady_fire_time(p)
+        gap = float(np.asarray(belt.gap_at(t)).reshape(-1)[0])
+        sigma = float(wind.sealing_at(t).sigma)
+
+        # --- 速度剖面 ---
+        z = np.linspace(0.0, gap, 121)
+        ux, _, _ = wind.velocity(0.0, 0.0, z, t)
+        ax1.plot(ux, z * 1000, color=colour, lw=2.2,
+                 label=f"{label}  σ={sigma:.3f}")
+
+        # --- 軌跡與飄移 ---
+        r = fire_burst(p, t_fire=t, belt=belt, wind=wind, record_frames=90)
+        traj = r.wind_flight.trajectory
+        mid = p.n_nozzles // 2
+        m = traj[:, mid, 2] > 0
+        xs = np.append(traj[m, mid, 0], r.wind_flight.landing_x[mid]) * 1e6
+        zs = np.append(traj[m, mid, 2], 0.0) * 1000
+        ax2.plot(xs, zs, color=colour, lw=2.0, label=label)
+
+        n = np.arange(1, p.n_nozzles + 1)
+        ax3.plot(n, r.drift_y_um, color=colour, lw=2.0,
+                 label=f"{label}  Δx={np.mean(r.drift_x_um):+.1f}µm")
+
+    ax1.axvline(0, color="k", lw=0.9)
+    ax1.set_xlabel("u_x (m/s)")
+    ax1.set_ylabel("Z 高度 (mm)")
+    ax1.set_title("間隙速度剖面\n擋板把貫流變成回流", fontsize=10)
+    ax1.legend(fontsize=8.5, loc="upper right")
+    ax1.text(0.05, 0.12, "← 逆向流抵消飄移", transform=ax1.transAxes,
+             fontsize=8.5, color="#2ca02c", va="center")
+
+    ax2.axvline(0, color="k", lw=0.9, ls=":")
+    ax2.set_xlabel("X 偏移 (µm)")
+    ax2.set_ylabel("Z 高度 (mm)")
+    ax2.set_title("墨滴軌跡 (陣列中央)", fontsize=10)
+    ax2.legend(fontsize=8.5)
+
+    ax3.axhline(0, color="k", lw=0.9)
+    ax3.set_xlabel("噴嘴編號")
+    ax3.set_ylabel("Δy 橫向飄移 (µm)")
+    ax3.set_title("300 噴嘴的橫向飄移", fontsize=10)
+    ax3.legend(fontsize=8.5)
+
+    fig.suptitle(
+        f"擋板效果對照   {params.belt_speed_m_min:.0f} m/min · 間隙 {params.gap_mm:.1f}mm · "
+        f"下緣間隙 {params.baffle.clearance_mm:.2f}mm",
+        fontsize=12)
+    fig.tight_layout()
+    return _save(fig, Path(outdir), "baffle_comparison.png")
+
+
+def plot_clearance_sweep(sweep: BaffleClearanceSweep, outdir: Path) -> Path:
+    """飄移量 vs 擋板下緣間隙 —— 標出零飄移點與撞擊邊界。"""
+    p = sweep.params
+    c = sweep.clearance_mm
+
+    fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(10.5, 7.4), sharex=True,
+                                   gridspec_kw={"height_ratios": [2, 1]})
+
+    ax1.plot(c, sweep.drift_x_um, "o-", color="#1f77b4", lw=2.2, ms=3.5,
+             label="Δx 縱向飄移")
+    ax1.plot(c, sweep.edge_drift_y_um, "s--", color="#d2a8ff", lw=1.5, ms=3,
+             label="Δy 兩端橫向飄移")
+    ax1.plot(c, sweep.scatter_um, "^:", color="#f0883e", lw=1.5, ms=3,
+             label="亂流散布 RMS (前緣分離)")
+    ax1.axhline(0, color="k", lw=1.0)
+
+    # 零飄移點
+    sign = np.sign(sweep.drift_x_um)
+    cross = np.nonzero(np.diff(sign) != 0)[0]
+    if cross.size:
+        i = cross[0]
+        x0, x1 = c[i], c[i + 1]
+        y0, y1 = sweep.drift_x_um[i], sweep.drift_x_um[i + 1]
+        c_zero = x0 - y0 * (x1 - x0) / (y1 - y0)
+        ax1.axvline(c_zero, color="#3fb950", lw=2.0, ls="-")
+        ax1.plot([c_zero], [0], "o", color="#3fb950", ms=9, zorder=5)
+        ax1.annotate(
+            f"零飄移點\n{c_zero:.3f} mm",
+            xy=(c_zero, 0),
+            xytext=(c_zero + (c[-1] - c[0]) * 0.10, np.max(sweep.drift_x_um) * 0.45),
+            fontsize=10, color="#3fb950", fontweight="bold",
+            arrowprops=dict(arrowstyle="->", color="#3fb950", lw=1.4),
+        )
+
+    # 撞擊禁區
+    ax1.axvspan(c[0], sweep.required_clearance_mm, color="#f85149", alpha=0.13)
+    ax1.axvspan(sweep.required_clearance_mm, sweep.required_clearance_mm + 0.3,
+                color="#f0883e", alpha=0.13)
+    ax1.text(sweep.required_clearance_mm, np.min(sweep.drift_x_um) * 0.92,
+             f" 撞擊禁區 < {sweep.required_clearance_mm:.2f}mm\n"
+             f" (跳動 {sweep.required_clearance_mm - p.baffle.box_height_tolerance_mm:.2f}"
+             f" + 箱高公差 {p.baffle.box_height_tolerance_mm:.2f})",
+             fontsize=8.5, color="#f85149", va="bottom")
+
+    ax1.set_ylabel("飄移 (µm)")
+    ax1.legend(fontsize=9, loc="upper left")
+    ax1.set_title(
+        f"擋板下緣間隙掃描   {p.belt_speed_m_min:.0f} m/min · 箱重 {p.box_mass_kg:.0f}kg · "
+        f"間隙 {p.gap_mm:.1f}mm · 圓角 R{p.baffle.edge_radius_mm:.2f}mm\n"
+        f"密封不足→殘留正向飄移；密封過度→回流佔上風而變成負向飄移",
+        fontsize=11)
+
+    ax4 = ax1.twinx()
+    ax4.set_ylim(np.array(ax1.get_ylim()) / (p.nozzle_pitch * 1e6))
+    ax4.set_ylabel(f"換算點距 ({p.dpi:.0f} dpi)")
+    ax4.grid(False)
+
+    ax2.plot(c, sweep.sigma, "o-", color="#9467bd", lw=2.0, ms=3.5,
+             label="密封有效度 σ")
+    ax2.plot(c, sweep.net_flux / max(sweep.net_flux.max(), 1e-12), "s--",
+             color="#8b949e", lw=1.4, ms=3, label="淨流量 (正規化)")
+    ax2.set_xlabel("擋板下緣與箱面的間隙 (mm)")
+    ax2.set_ylabel("σ / 正規化淨流量")
+    ax2.legend(fontsize=9)
+    ax2.axvspan(c[0], sweep.required_clearance_mm, color="#f85149", alpha=0.13)
+
+    fig.tight_layout()
+    return _save(fig, Path(outdir), "baffle_clearance_sweep.png")

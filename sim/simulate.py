@@ -17,6 +17,7 @@ from dataclasses import dataclass
 
 import numpy as np
 
+from .baffle import CollisionCheck, check_collision
 from .belt import BeltKinematics
 from .config import SimParams
 from .droplet import DropletSwarm, FlightResult
@@ -302,4 +303,182 @@ def x_resolution_report(params: SimParams) -> str:
             f" (TIJ 上限約 12~15 kHz)",
             f"  X:Y 解析度比 = 1 : {p.dpi / max(p.x_dpi, 1e-9):.1f}",
         ]
+    )
+
+
+# ----------------------------------------------------------------------
+# 擋板: 零飄移密封點求解與亂流散布
+# ----------------------------------------------------------------------
+class _UniformWind:
+    """固定均勻氣流的假風場, 用來量測墨滴的線性響應轉移函數。"""
+
+    def __init__(self, ux: float) -> None:
+        self._u = np.array([float(ux), 0.0, 0.0])
+
+    def velocity_at(self, pos, t):
+        return np.broadcast_to(self._u, np.shape(pos)).copy()
+
+
+def crosswind_response(params: SimParams, gap: float | None = None) -> float:
+    """單位橫向風速造成的落點位移 (m per m/s) —— 墨滴的線性響應轉移函數。
+
+    用來把亂流強度換算成落點散布。不能直接用 drift_x/u_mean 估算, 因為
+    密封過度時 drift_x 是兩個反向貢獻相消的結果, 比值會失效。
+    """
+    swarm = DropletSwarm(params.replace(n_nozzles=1))
+    z0 = params.gap if gap is None else float(gap)
+    calm = swarm.fly(None, launch_gap=z0)
+    probe = swarm.fly(_UniformWind(1.0), launch_gap=z0)
+    return float(probe.landing_x[0] - calm.landing_x[0])
+
+
+def turbulence_scatter(params: SimParams, belt: BeltKinematics, t: float) -> float:
+    """銳利擋板前緣脫落渦流造成的落點散布 RMS (m)。
+
+    這是與系統性飄移不同的失效模式: 系統性飄移造成「字歪斜」,
+    隨機散布造成「邊緣模糊 / 毛邊」。
+    """
+    from .windfield import WindField
+
+    wind = WindField(params, belt)
+    seal = wind.sealing_at(t)
+    u_box = float(np.asarray(belt.box_speed_at(t)).reshape(-1)[0])
+    gap = float(np.asarray(belt.gap_at(t)).reshape(-1)[0])
+    u_rms = float(seal.turbulence_intensity) * u_box
+    return abs(crosswind_response(params, gap)) * u_rms
+
+
+@dataclass
+class ZeroDriftSolution:
+    """使淨飄移為零的擋板下緣間隙。"""
+
+    found: bool
+    clearance_mm: float
+    drift_x_um: float
+    sigma: float
+    collision: CollisionCheck | None
+    bracket_mm: tuple[float, float]
+    note: str
+
+
+def find_zero_drift_clearance(
+    params: SimParams,
+    lo_mm: float = 0.3,
+    hi_mm: float = 3.0,
+    tol_mm: float = 0.005,
+    max_iter: int = 40,
+) -> ZeroDriftSolution:
+    """二分搜尋使縱向飄移 Δx 過零的擋板下緣間隙。
+
+    物理背景: 密封不足 -> 殘留正向飄移; 密封過度 -> 回流佔上風,
+    飄移變成負向。兩者之間必存在一個零點, 那就是最佳密封程度。
+
+    需要 params.baffle.enabled 且上下游都有擋板 (否則無法形成回流)。
+    """
+    if not params.baffle.active:
+        return ZeroDriftSolution(
+            False, float("nan"), float("nan"), 0.0, None, (lo_mm, hi_mm),
+            "擋板未啟用 —— 無法形成回流, 不存在零飄移點。",
+        )
+    if params.baffle.n_sides < 2:
+        return ZeroDriftSolution(
+            False, float("nan"), float("nan"), 0.0, None, (lo_mm, hi_mm),
+            "只有單側擋板 —— 腔體不封閉, 無法形成零淨流量回流。",
+        )
+
+    def drift_at(clearance_mm: float) -> tuple[float, float]:
+        p = params.replace(baffle=params.baffle.replace(clearance_mm=clearance_mm))
+        belt = BeltKinematics(p)
+        from .windfield import WindField
+
+        wind = WindField(p, belt)
+        t = steady_fire_time(p)
+        r = fire_burst(p, t_fire=t, belt=belt, wind=wind)
+        return float(np.mean(r.drift_x_um)), float(wind.sealing_at(t).sigma)
+
+    d_lo, _ = drift_at(lo_mm)     # 密封最強 -> 預期為負
+    d_hi, _ = drift_at(hi_mm)     # 密封最弱 -> 預期為正
+
+    if d_lo * d_hi > 0:
+        side = "全為正 (密封仍不足)" if d_lo > 0 else "全為負 (密封已過度)"
+        return ZeroDriftSolution(
+            False, float("nan"), float("nan"), 0.0, None, (lo_mm, hi_mm),
+            f"區間 [{lo_mm}, {hi_mm}] mm 內飄移{side}, 無零點。"
+            f"Δx({lo_mm}mm)={d_lo:+.1f}µm, Δx({hi_mm}mm)={d_hi:+.1f}µm",
+        )
+
+    a, b = lo_mm, hi_mm
+    fa = d_lo
+    for _ in range(max_iter):
+        mid = 0.5 * (a + b)
+        fm, _ = drift_at(mid)
+        if abs(fm) < 1e-9 or (b - a) < tol_mm:
+            break
+        if fa * fm < 0:
+            b = mid
+        else:
+            a, fa = mid, fm
+
+    best = 0.5 * (a + b)
+    drift, sigma = drift_at(best)
+    p_best = params.replace(baffle=params.baffle.replace(clearance_mm=best))
+    coll = check_collision(p_best.baffle, BeltKinematics(p_best).bounce_amplitude_mm)
+
+    return ZeroDriftSolution(
+        True, best, drift, sigma, coll, (lo_mm, hi_mm),
+        f"下緣間隙 {best:.3f} mm 時 Δx = {drift:+.2f} µm (σ = {sigma:.3f})。{coll.message}",
+    )
+
+
+@dataclass
+class BaffleClearanceSweep:
+    """飄移量隨擋板下緣間隙的變化 —— 用來找零飄移點與看撞擊邊界。"""
+
+    params: SimParams
+    clearance_mm: np.ndarray
+    sigma: np.ndarray
+    drift_x_um: np.ndarray
+    edge_drift_y_um: np.ndarray
+    net_flux: np.ndarray
+    scatter_um: np.ndarray
+    required_clearance_mm: float
+    """機械上所需的最小下緣間隙 (跳動 + 箱高公差)。"""
+
+
+def sweep_baffle_clearance(
+    params: SimParams,
+    values_mm=None,
+) -> BaffleClearanceSweep:
+    """掃描擋板下緣間隙, 回傳飄移、密封度、淨流量與亂流散布。"""
+    from .windfield import WindField
+
+    if values_mm is None:
+        values_mm = np.linspace(0.3, 3.0, 28)
+    values_mm = np.asarray(values_mm, dtype=float)
+
+    sig, dx, dy, flux, scat = [], [], [], [], []
+    for c in values_mm:
+        p = params.replace(baffle=params.baffle.replace(clearance_mm=float(c)))
+        belt = BeltKinematics(p)
+        wind = WindField(p, belt)
+        t = steady_fire_time(p)
+        r = fire_burst(p, t_fire=t, belt=belt, wind=wind)
+        sig.append(float(wind.sealing_at(t).sigma))
+        dx.append(float(np.mean(r.drift_x_um)))
+        dy.append(float(np.max(np.abs(r.drift_y_um))))
+        flux.append(wind.net_flux(t))
+        scat.append(turbulence_scatter(p, belt, t) * 1e6)
+
+    belt0 = BeltKinematics(params)
+    required = belt0.bounce_amplitude_mm + params.baffle.box_height_tolerance_mm
+
+    return BaffleClearanceSweep(
+        params=params,
+        clearance_mm=values_mm,
+        sigma=np.array(sig),
+        drift_x_um=np.array(dx),
+        edge_drift_y_um=np.array(dy),
+        net_flux=np.array(flux),
+        scatter_um=np.array(scat),
+        required_clearance_mm=required,
     )

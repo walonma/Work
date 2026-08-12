@@ -53,6 +53,30 @@
   #cGap { height: 240px; }
   #cTraj, #cDrift { height: 230px; }
   #cSeries { height: 150px; }
+  #cBaffle { height: 258px; }
+
+  .bafgrid { display: grid; grid-template-columns: 1fr 1.15fr; gap: 14px; }
+  @media (max-width: 860px) { .bafgrid { grid-template-columns: 1fr; } }
+  .bafctl { display: grid; grid-template-columns: 1fr 1fr; gap: 4px 12px; }
+  .bafctl .ctl { margin-bottom: 8px; }
+  .bafctl .ctl label { font-size: 11.5px; }
+  .toggles { display: flex; flex-wrap: wrap; gap: 12px; margin-bottom: 12px; }
+  .toggles label {
+    display: flex; align-items: center; gap: 5px;
+    font-size: 12.5px; cursor: pointer; user-select: none;
+  }
+  input[type=checkbox] { accent-color: var(--accent); width: 15px; height: 15px; margin: 0; }
+  .bafbtns { display: flex; gap: 8px; margin-top: 4px; }
+  button.prev { background: #1a3f6b; border-color: var(--accent); }
+  button.apply { background: #4a3a0f; border-color: #e3b341; }
+  .status {
+    font-size: 11.5px; margin-top: 9px; padding: 7px 9px;
+    border-radius: 5px; border: 1px solid var(--line); background: #0d1117;
+  }
+  .status.safe { border-color: var(--ok); color: #7ee787; }
+  .status.warn { border-color: var(--warn); color: #ffc680; }
+  .status.collision { border-color: var(--hot); color: #ffa198; }
+  .status.stale { border-color: #e3b341; color: #f2cc60; }
   .cap { color: var(--dim); font-size: 11.5px; margin-top: 6px; }
 
   table.read { width: 100%; border-collapse: collapse; font-size: 12.5px; }
@@ -141,6 +165,9 @@
           <tr><td>飄移角度（兩端）</td><td id="rAng">—</td></tr>
           <tr><td>擾動循環頻率</td><td id="rFreq">—</td></tr>
           <tr><td>Stokes 數</td><td id="rStk">—</td></tr>
+          <tr><td style="color:var(--ok)">擋板密封 σ</td><td id="rSigma">—</td></tr>
+          <tr><td style="color:var(--ok)">淨流量（相對無擋板）</td><td id="rFlux">—</td></tr>
+          <tr><td style="color:var(--warn)">亂流散布 RMS</td><td id="rScat">—</td></tr>
         </table>
         <div class="note" id="noteX"></div>
       </div>
@@ -148,6 +175,78 @@
 
     <!-- ============ 視圖 ============ -->
     <div>
+      <div class="card">
+        <h2>導風擋板 / 擾流板設計</h2>
+        <div class="bafgrid">
+          <div>
+            <div class="toggles">
+              <label><input type="checkbox" id="bEnable"> 啟用擋板</label>
+              <label><input type="checkbox" id="bUp" checked> 上游側</label>
+              <label><input type="checkbox" id="bDown" checked> 下游側</label>
+              <label><input type="checkbox" id="bY" checked> Y 端板</label>
+            </div>
+            <div class="bafctl">
+              <div class="ctl">
+                <label>下緣間隙 <span class="val" id="vbClear"></span></label>
+                <input type="range" id="bClear" min="0.3" max="3" step="0.01" value="1.5">
+              </div>
+              <div class="ctl">
+                <label>厚度 <span class="val" id="vbThick"></span></label>
+                <input type="range" id="bThick" min="0.4" max="3" step="0.1" value="1">
+              </div>
+              <div class="ctl">
+                <label>斜角 <span class="val" id="vbAngle"></span></label>
+                <input type="range" id="bAngle" min="0" max="60" step="1" value="20">
+              </div>
+              <div class="ctl">
+                <label>寬度 <span class="val" id="vbWidth"></span></label>
+                <input type="range" id="bWidth" min="1" max="1.5" step="0.05" value="1.25">
+              </div>
+              <div class="ctl">
+                <label>X 內腔長 <span class="val" id="vbExtent"></span></label>
+                <input type="range" id="bExtent" min="15" max="60" step="1" value="25">
+              </div>
+              <div class="ctl">
+                <label>串列片數 <span class="val" id="vbStages"></span></label>
+                <input type="range" id="bStages" min="1" max="5" step="1" value="2">
+              </div>
+              <div class="ctl">
+                <label>片間距 <span class="val" id="vbPitch"></span></label>
+                <input type="range" id="bPitch" min="1" max="8" step="0.5" value="2.5">
+              </div>
+              <div class="ctl">
+                <label>前緣圓角 <span class="val" id="vbRad"></span></label>
+                <input type="range" id="bRad" min="0" max="1.5" step="0.05" value="0.3">
+              </div>
+              <div class="ctl">
+                <label>洩壓孔比 <span class="val" id="vbVent"></span></label>
+                <input type="range" id="bVent" min="0" max="0.3" step="0.01" value="0">
+              </div>
+              <div class="ctl">
+                <label>箱高公差 <span class="val" id="vbTol"></span></label>
+                <input type="range" id="bTol" min="0" max="2" step="0.05" value="0.5">
+              </div>
+            </div>
+            <div class="bafbtns">
+              <button id="bPreview" class="prev">👁 預覽設計</button>
+              <button id="bApply" class="apply">▶ 套用並模擬</button>
+            </div>
+            <div class="bafbtns">
+              <button id="bZero">⌖ 求零飄移間隙</button>
+            </div>
+            <div class="status" id="bStatus">按「預覽設計」查看剖面與密封效果。</div>
+          </div>
+          <div>
+            <canvas id="cBaffle" height="258"></canvas>
+            <div class="cap" id="bCap">
+              擋板無法製造真正的「無風區」——箱面是移動的實體壁面，no-slip
+              強制貼面空氣跟著跑。擋板能做的是把單向貫流變成零淨流量的循環流，
+              讓上方逆向流抵消下方正向流。
+            </div>
+          </div>
+        </div>
+      </div>
+
       <div class="card">
         <h2>產線總覽（右 → 左）</h2>
         <canvas id="cLine" height="150"></canvas>
@@ -241,6 +340,101 @@ const P = {
 };
 
 // =====================================================================
+// 導風擋板（移植自 sim/baffle.py）
+//
+// 物理硬限制：箱頂面是以 U 移動的實體壁面，no-slip 強制緊貼箱面的空氣
+// 必須跟著跑 U。任何擋板都擋不掉這道剪切流，做不出真正的「無風區」。
+//
+// 擋板真正能做到的是把單向貫流變成零淨流量的循環流：
+//     u(ζ) = U(1−ζ) − 3·U·σ·ζ(1−ζ)
+// σ=1 時 ∫u dζ = 0：上方 2/3 逆向、下方 1/3 正向，互相抵消。
+// 因此存在一個最佳密封程度使淨飄移為零。
+//
+// σ 由一維潤滑串聯網路解出（見 sim/baffle.py 的推導）：
+//     Q = (U/2)·[Σ Lᵢ/hᵢ²] / [Σ Lᵢ/hᵢ³] ≡ U·δ_eff/2 ,  σ = 1 − δ_eff/h
+// =====================================================================
+const KB = { ventLeak: 0.5, ventRelief: 0.8, angleDeflect: 0.5, separation: 0.08 };
+
+/** B = 編輯中的設計（pending）；BA = 已套用到模擬的設計（active）。 */
+const B = {
+  enabled: false, upstream: true, downstream: true, yPlates: true,
+  clearanceMm: 1.5, thicknessMm: 1.0, angleDeg: 20, widthIn: 1.25,
+  xExtentMm: 25, nStages: 2, stagePitchMm: 2.5, edgeRadiusMm: 0.3,
+  ventRatio: 0, boxTolMm: 0.5,
+};
+let BA = Object.assign({}, B);
+
+const bSides = b => (b.upstream ? 1 : 0) + (b.downstream ? 1 : 0);
+const bActive = b => b.enabled && (bSides(b) > 0 || b.yPlates);
+const bConstrLen = b => (b.thicknessMm / 1000) / Math.cos(b.angleDeg * Math.PI / 180);
+
+function bFootprint(b) {
+  if (!bActive(b)) return 0;
+  const per = b.nStages * bConstrLen(b) + Math.max(b.nStages - 1, 0) * b.stagePitchMm / 1000;
+  return b.xExtentMm / 1000 + bSides(b) * per;
+}
+
+/** 正對箱面的實體表面總長度 —— 決定拘束因子的過渡寬度。 */
+function effPlateX() {
+  return bActive(BA) ? Math.max(bFootprint(BA), K.plateX) : K.plateX;
+}
+
+function solveSealing(b, h, plateHalfY) {
+  if (!bActive(b)) {
+    return { sigma: 0, pulse: 1, deltaEff: h, sigmaY: 0, latHalf: plateHalfY, turb: 0 };
+  }
+  const delta = Math.min(b.clearanceMm / 1000, h);
+  const Lb = bConstrLen(b), n = b.nStages;
+  const Lc = b.xExtentMm / 1000, sp = b.stagePitchMm / 1000;
+  const sides = bSides(b);
+
+  let s2 = Lc / (h * h);
+  let s3 = Lc / (h * h * h);
+  s2 += sides * (n * Lb / (delta * delta) + Math.max(n - 1, 0) * sp / (h * h));
+  s3 += sides * (n * Lb / (delta ** 3) + Math.max(n - 1, 0) * sp / (h ** 3));
+
+  const deltaEff = s2 / s3;
+  let sigma = 1 - deltaEff / h;
+  let pulse = (Lc / (h ** 3)) / s3 *
+              (1 - KB.angleDeflect * Math.sin(b.angleDeg * Math.PI / 180));
+  if (b.ventRatio > 0) {                     // 洩壓孔：釋放脈衝但造成旁通洩漏
+    pulse *= 1 - KB.ventRelief * b.ventRatio;
+    sigma -= KB.ventLeak * b.ventRatio;
+  }
+  sigma = clamp(sigma, 0, 1);
+  pulse = clamp(pulse, 0, 1);
+
+  let sigmaY = 0;
+  if (b.yPlates) {                           // Y 端板：同一套 δ³ 機制
+    const hw = b.widthIn * INCH / 2;
+    const y2 = hw / (h * h) + n * Lb / (delta * delta);
+    const y3 = hw / (h ** 3) + n * Lb / (delta ** 3);
+    sigmaY = clamp(1 - (y2 / y3) / h, 0, 1);
+  }
+  // 擋板比噴印帶寬 -> 橫向逸流出口外移 -> 陣列上的梯度變小
+  const latHalf = Math.max(b.widthIn * INCH / 2, plateHalfY);
+
+  // 前緣圓角需與下緣間隙同量級才能抑制分離渦流
+  const sharp = clamp(1 - (b.edgeRadiusMm / 1000) / Math.max(0.5 * delta, 1e-12), 0, 1);
+  const turb = sides > 0 ? KB.separation * sharp : 0;
+
+  return { sigma, pulse, deltaEff, sigmaY, latHalf, turb };
+}
+
+function collisionCheck(b, bounceMm) {
+  const req = bounceMm + b.boxTolMm;
+  const margin = b.clearanceMm - req;
+  return { req, margin,
+           level: margin >= 0.3 ? "safe" : margin >= 0 ? "warn" : "collision" };
+}
+
+/** 幾何約束：圓角半徑最大只能等於半厚（完全圓化的鼻端）。 */
+function clampEdgeRadius(b) {
+  b.edgeRadiusMm = Math.min(b.edgeRadiusMm, b.thicknessMm / 2);
+  return b.edgeRadiusMm;
+}
+
+// =====================================================================
 // 皮帶狀態（即時積分，含啟停斜坡與質量耦合）
 // =====================================================================
 const belt = { vBelt: 0, vBox: 0, dist: 0, simTime: 0, running: false };
@@ -265,7 +459,7 @@ function smoothstep(x) { const c = clamp(x, 0, 1); return c * c * (3 - 2 * c); }
 function beltState() {
   const pitch = P.pitch;
   const u = ((belt.dist % pitch) + pitch) % pitch;
-  const w = Math.max(K.plateX / 2, 1e-6);
+  const w = Math.max(effPlateX() / 2, 1e-6);
   const conf = smoothstep(u / w) * smoothstep((P.boxLen - u) / w);
 
   const ratio = P.beltSpeed > 0 ? clamp(belt.vBox / P.beltSpeed, 0, 1) : 0;
@@ -276,6 +470,7 @@ function beltState() {
   return {
     u, conf, gap, uBox: belt.vBox, t: belt.simTime,
     sCur: u, sNext: u - pitch, sTrail: u - P.boxLen,
+    seal: solveSealing(BA, gap, P.plateHalfY),
   };
 }
 
@@ -293,16 +488,23 @@ function wind(x, y, z, st, out) {
   const e2 = Math.exp(-Math.pow((st.sNext - x) / s, 2));
   const envLead = e1 + e2;
   const envTrail = Math.exp(-Math.pow((st.sTrail - x) / (1.5 * s), 2));
-  const aEdge = K.cLeading * U * envLead - K.cTrailing * U * envTrail;
+  let aEdge = K.cLeading * U * envLead - K.cTrailing * U * envTrail;
 
-  // 1) Couette 剪切  2) 前後緣壓差脈衝  3) 箱間尾流回流
+  const sl = st.seal;
+  aEdge *= sl.pulse;                      // 擋板阻力衰減壓差脈衝
+
+  // 1) Couette 剪切 + 擋板造成的回流（σ=1 時淨流量為零）
+  //    回流項用 Poiseuille 型剖面，兩壁為零 -> 邊界條件不受影響
+  // 2) 前後緣壓差脈衝  3) 箱間尾流回流
   const wake = -K.cWake * U * Math.exp(-Math.max(st.sTrail - x, 0) / K.wakeLength);
-  let ux = st.conf * U * profC + aEdge * profP + (1 - st.conf) * wake * profC;
+  let ux = st.conf * U * (profC - 0.5 * sl.sigma * profP)
+         + aEdge * profP
+         + (1 - st.conf) * wake * profC;
 
-  // 4) 橫向擠壓膜逸流 —— 特徵長度是噴嘴板半長 12.7mm，不是箱半寬 250mm
-  const eta = y / P.plateHalfY;
-  const B = K.cLateral * aEdge + K.cLateralSteady * st.conf * U;
-  const uy = B * Math.sign(eta) * Math.pow(Math.abs(eta), K.pLateral) * profP;
+  // 4) 橫向擠壓膜逸流。特徵長度是噴嘴板（或更寬的擋板）半長，不是箱半寬。
+  const eta = y / sl.latHalf;
+  const bl = (K.cLateral * aEdge + K.cLateralSteady * st.conf * U) * (1 - sl.sigmaY);
+  const uy = bl * Math.sign(eta) * Math.pow(Math.abs(eta), K.pLateral) * profP;
 
   // 5) 前緣抬升 / 後緣下沉。噴嘴板永遠是實體壁面 -> z=h 恆為零
   const profV = st.conf * profP + (1 - st.conf) * profC;
@@ -332,9 +534,15 @@ function gapSpeedStats(st) {
 const DT = 2e-6;
 const MAX_STEPS = 1200;
 
+let WIND_OVERRIDE = null;   // 設為 [ux,uy,uz] 時取代風場，用來量測轉移函數
+
 function accel(px, py, pz, vx, vy, vz, st, useWind, o) {
   let ax = 0, ay = 0, az = 0;
-  if (useWind) { wind(px, py, pz, st, _w); ax = _w[0]; ay = _w[1]; az = _w[2]; }
+  if (WIND_OVERRIDE) {
+    ax = WIND_OVERRIDE[0]; ay = WIND_OVERRIDE[1]; az = WIND_OVERRIDE[2];
+  } else if (useWind) {
+    wind(px, py, pz, st, _w); ax = _w[0]; ay = _w[1]; az = _w[2];
+  }
   const rx = ax - vx, ry = ay - vy, rz = az - vz;
   const sp = Math.hypot(rx, ry, rz);
   const re = AIR.rho * P.dropDiameter * sp / AIR.mu;
@@ -440,6 +648,65 @@ function fireBurst(st, full) {
     burst.driftX[i] = sx[seg] + f * (sx[seg + 1] - sx[seg]);
     burst.driftY[i] = sy[seg] + f * (sy[seg + 1] - sy[seg]);
   }
+}
+
+/** 建構「箱體中段、滿速」的穩態狀態，供設計評估用（忽略跳動）。 */
+function steadyState(b) {
+  const bb = b || BA;
+  const pitch = P.pitch, u = P.boxLen * 0.5;
+  const fp = bActive(bb) ? Math.max(bFootprint(bb), K.plateX) : K.plateX;
+  const w = Math.max(fp / 2, 1e-6);
+  return {
+    u, conf: smoothstep(u / w) * smoothstep((P.boxLen - u) / w),
+    gap: P.gap, uBox: P.beltSpeed, t: u / Math.max(P.beltSpeed, 1e-9),
+    sCur: u, sNext: u - pitch, sTrail: u - P.boxLen,
+    seal: solveSealing(bb, P.gap, P.plateHalfY),
+  };
+}
+
+/** 單位橫向風速造成的落點位移 (m per m/s) —— 墨滴的線性響應轉移函數。
+ *  不能用 Δx/u_mean 估算：密封過度時 Δx 是兩個反向貢獻相消的結果。 */
+function crosswindResponse(st) {
+  WIND_OVERRIDE = [0, 0, 0];
+  const calm = flyOne(0, st, true, null);
+  WIND_OVERRIDE = [1, 0, 0];
+  const probe = flyOne(0, st, true, null);
+  WIND_OVERRIDE = null;
+  return probe.x - calm.x;
+}
+
+/** 前緣分離渦流造成的落點散布 RMS (m)。 */
+function turbulenceScatter(st) {
+  return Math.abs(crosswindResponse(st)) * st.seal.turb * st.uBox;
+}
+
+/** 給定下緣間隙時的平均縱向飄移 (µm)，用取樣噴嘴估算。 */
+function meanDriftAt(clearanceMm) {
+  const st = steadyState(Object.assign({}, B, { clearanceMm }));
+  const nom = flyOne(0, st, false, null);
+  const NS2 = 9;
+  let sum = 0;
+  for (let k = 0; k < NS2; k++) {
+    const i = Math.round(k * (P.nNozzles - 1) / (NS2 - 1));
+    const r = flyOne(NOZ_Y[i], st, true, null);
+    sum += r.x - st.uBox * (r.t - nom.t);
+  }
+  return sum / NS2 * 1e6;
+}
+
+/** 二分搜尋使淨飄移為零的下緣間隙 (mm)，找不到回傳 null。 */
+function solveZeroDrift() {
+  let lo = 0.3, hi = 3.0;
+  let fLo = meanDriftAt(lo);
+  const fHi = meanDriftAt(hi);
+  if (fLo * fHi > 0) return null;
+  for (let it = 0; it < 26; it++) {
+    const mid = 0.5 * (lo + hi);
+    const fm = meanDriftAt(mid);
+    if (Math.abs(fm) < 1e-3 || hi - lo < 0.004) { lo = hi = mid; break; }
+    if (fLo * fm < 0) hi = mid; else { lo = mid; fLo = fm; }
+  }
+  return 0.5 * (lo + hi);
 }
 
 // =====================================================================
@@ -583,6 +850,25 @@ function drawGap(st) {
       const dx = -_w[0] * sc, dz = -_w[2] * sc * (ph / gap) / (pw / (2 * halfX));
       if (Math.hypot(dx, dz) < 1.2) continue;
       arrow(ctx, X2p(x), Z2p(z), X2p(x) + dx, Z2p(z) + dz, 3.2);
+    }
+  }
+
+  // 擋板（畫在風場之上，標示拘束範圍）
+  if (bActive(BA) && bSides(BA) > 0) {
+    const hB = gap - BA.clearanceMm / 1000;
+    const cav = BA.xExtentMm / 2000;
+    const lb = bConstrLen(BA);
+    for (const side of [-1, 1]) {
+      if (side < 0 && !BA.upstream) continue;
+      if (side > 0 && !BA.downstream) continue;
+      let xx = cav;
+      for (let k = 0; k < BA.nStages; k++) {
+        const x0 = X2p(side * xx), x1 = X2p(side * (xx + lb));
+        ctx.fillStyle = "rgba(148,103,189,.92)";
+        ctx.fillRect(Math.min(x0, x1), padT, Math.abs(x1 - x0) || 2,
+                     (hB / gap) * ph);
+        xx += lb + (k < BA.nStages - 1 ? BA.stagePitchMm / 1000 : 0);
+      }
     }
   }
 
@@ -793,9 +1079,17 @@ function updateReadout() {
   q("rDy").textContent = "±" + (edgeDy * 1e6).toFixed(1) + " µm";
   q("rMag").textContent = (mMag * 1e6).toFixed(1) + " µm";
   q("rDot").textContent = (mMag / P.nozzlePitch).toFixed(2) + " 個點距";
-  q("rAng").textContent = "±" + ang.toFixed(1) + "°";
+  // Δx 接近零時角度失去意義（飄移變成幾乎純橫向），避免顯示誤導性的 ~90°
+  q("rAng").textContent = (mMag / P.nozzlePitch) < 0.1
+    ? "— （飄移已可忽略）" : "±" + ang.toFixed(1) + "°";
   q("rFreq").textContent = P.cycleHz > 0 ? P.cycleHz.toFixed(2) + " Hz" : "—";
   q("rStk").textContent = (P.tau / Math.max(burst.flightTime, 1e-9)).toFixed(1);
+
+  const sl = st.seal;
+  q("rSigma").textContent = bActive(BA) ? sl.sigma.toFixed(3) : "未啟用";
+  q("rFlux").textContent = bActive(BA) ? ((1 - sl.sigma) * 100).toFixed(1) + " %" : "100 %";
+  q("rScat").textContent = bActive(BA) && sl.turb > 0
+    ? (turbulenceScatter(st) * 1e6).toFixed(1) + " µm" : "0.0 µm";
 
   const need = P.beltSpeed / P.nozzlePitch;
   const xdpi = P.beltSpeed > 0 ? INCH / (P.beltSpeed / P.fireHz) : 0;
@@ -804,6 +1098,130 @@ function updateReadout() {
     `Y 向 <b>${P.dpi.toFixed(0)} dpi</b>。要讓 X 向追平需 ` +
     `<b>${(need / 1000).toFixed(1)} kHz</b>，超出 TIJ 的 12~15 kHz 上限。` +
     `此項造成「字被拉長」，與風場造成的「字歪斜／邊緣模糊」是不同來源。`;
+}
+
+// =====================================================================
+// 擋板設計預覽（「預覽設計」鍵）
+// =====================================================================
+function drawBafflePreview(b) {
+  const { ctx, w, h } = fitCanvas(document.getElementById("cBaffle"));
+  const gapMm = P.gapMm;
+  const seal = solveSealing(b, P.gap, P.plateHalfY);
+  const split = w * 0.62;
+
+  // ---------- 左：X-Z 剖面 ----------
+  const cavHalf = b.xExtentMm / 2;
+  const perSide = bActive(b)
+    ? b.nStages * bConstrLen(b) * 1000 + Math.max(b.nStages - 1, 0) * b.stagePitchMm
+    : 0;
+  const outer = cavHalf + (bSides(b) > 0 ? perSide : 0);
+  const spanX = Math.max(outer * 1.25 + 3, 20);
+
+  // 間隙僅數 mm 而跨距達數十 mm，等比例會把剖面壓成一條線。
+  // 採工程剖面慣用的變形比例：X 與 Z 分開縮放，並在圖上標明放大倍率。
+  const padT = 30, padB = 34;
+  const sc = (split - 34) / (2 * spanX);                  // X 方向 px/mm
+  const scZ = (h - padT - padB) / (gapMm * 1.25);         // Z 方向 px/mm
+  const zx = scZ / sc;                                    // Z 軸放大倍率
+  const cx = split / 2, zBase = h - padB;
+  const X = mm => cx + mm * sc;
+  const Z = mm => zBase - mm * scZ;
+
+  ctx.fillStyle = "#a8834a";
+  const WALL = 5;
+  ctx.fillRect(0, zBase, split, WALL);
+  ctx.fillStyle = "#d62728";
+  ctx.fillRect(X(-outer), Z(gapMm) - WALL, 2 * outer * sc, WALL);
+  ctx.fillStyle = "#e3b341";
+  ctx.fillRect(X(-K.plateX * 500), Z(gapMm) - 1.5, K.plateX * 1000 * sc, 3);
+
+  if (bActive(b)) {
+    const hB = gapMm - b.clearanceMm;
+    const lean = hB * Math.tan(b.angleDeg * Math.PI / 180);
+    const lb = bConstrLen(b) * 1000;
+    for (const side of [-1, 1]) {
+      if (side < 0 && !b.upstream) continue;
+      if (side > 0 && !b.downstream) continue;
+      let x = cavHalf;
+      for (let k = 0; k < b.nStages; k++) {
+        ctx.beginPath();
+        ctx.moveTo(X(side * x), Z(gapMm));
+        ctx.lineTo(X(side * (x + lb)), Z(gapMm));
+        ctx.lineTo(X(side * (x + lb + lean)), Z(b.clearanceMm));
+        ctx.lineTo(X(side * (x + lean)), Z(b.clearanceMm));
+        ctx.closePath();
+        ctx.fillStyle = "#9467bd"; ctx.fill();
+        ctx.strokeStyle = "#5b3a86"; ctx.lineWidth = 1; ctx.stroke();
+        if (b.edgeRadiusMm > 0) {   // 前緣圓角：變形比例下為橢圓
+          const ex = side < 0 ? x + lean : x + lb + lean;
+          ctx.beginPath();
+          ctx.ellipse(X(side * ex), Z(b.clearanceMm + b.edgeRadiusMm),
+                      Math.max(1.5, b.edgeRadiusMm * sc),
+                      Math.max(1.5, b.edgeRadiusMm * scZ), 0, 0, 7);
+          ctx.fillStyle = "#c9a0ff"; ctx.fill();
+        }
+        x += lb + (k < b.nStages - 1 ? b.stagePitchMm : 0);
+      }
+    }
+    if (b.ventRatio > 0) {
+      ctx.strokeStyle = "#010409"; ctx.lineWidth = 3;
+      for (let i = 0; i < 4; i++) {
+        const xv = -cavHalf * 0.6 + i * cavHalf * 0.4;
+        ctx.beginPath();
+        ctx.moveTo(X(xv), Z(gapMm) - WALL); ctx.lineTo(X(xv), Z(gapMm) + 1);
+        ctx.stroke();
+      }
+    }
+    // 下緣間隙尺寸
+    const xd = -cavHalf * 0.45;
+    ctx.strokeStyle = "#3fb950"; ctx.fillStyle = "#3fb950"; ctx.lineWidth = 1;
+    arrow(ctx, X(xd), Z(0), X(xd), Z(b.clearanceMm), 3);
+    arrow(ctx, X(xd), Z(b.clearanceMm), X(xd), Z(0), 3);
+    axisText(ctx, `${b.clearanceMm.toFixed(2)}mm`, X(xd) + 4,
+             Z(b.clearanceMm * 0.5) + 3, "#3fb950", "left", 10);
+    if (bSides(b) >= 2) {
+      axisText(ctx, "零淨流量循環區", cx, Z(gapMm * 0.78), "#58a6ff", "center", 9.5);
+      axisText(ctx, `σ = ${seal.sigma.toFixed(3)}`, cx, Z(gapMm * 0.52),
+               "#58a6ff", "center", 12);
+    }
+  }
+  axisText(ctx, `X-Z 剖面（Z 軸放大 ${zx.toFixed(1)}×）`, 8, 14, "#8b949e", "left", 10.5);
+  axisText(ctx, `間隙 ${gapMm.toFixed(1)}mm`, split - 8, 14, "#8b949e", "right", 10);
+  axisText(ctx, "◀ 箱子前進（箱頂面）", cx, h - 6, "#c9d1d9", "center", 9.5);
+
+  // ---------- 右：Y-Z 剖面 ----------
+  ctx.strokeStyle = "#30363d"; ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.moveTo(split, 6); ctx.lineTo(split, h - 6); ctx.stroke();
+
+  const halfY = bActive(b) ? b.widthIn * 25.4 / 2 : P.plateHalfY * 1000;
+  const spanY = halfY * 1.3 + 2;
+  const w2 = w - split;
+  const sc2 = (w2 - 30) / (2 * spanY);
+  const cx2 = split + w2 / 2;
+  const Y = mm => cx2 + mm * sc2;
+
+  ctx.fillStyle = "#a8834a";
+  ctx.fillRect(split + 2, zBase, w2 - 4, WALL);
+  ctx.fillStyle = "#d62728";
+  ctx.fillRect(Y(-halfY), Z(gapMm) - WALL, 2 * halfY * sc2, WALL);
+  ctx.fillStyle = "#e3b341";
+  ctx.fillRect(Y(-P.printHeight * 500), Z(gapMm) - 1.5, P.printHeight * 1000 * sc2, 3);
+
+  if (bActive(b) && b.yPlates) {
+    const lb = bConstrLen(b) * 1000;
+    ctx.fillStyle = "#9467bd"; ctx.strokeStyle = "#5b3a86";
+    for (const side of [-1, 1]) {
+      const x0 = side < 0 ? Y(-halfY) : Y(halfY) - lb * sc2;
+      ctx.fillRect(x0, Z(gapMm), Math.max(2, lb * sc2),
+                   (gapMm - b.clearanceMm) * scZ);
+      ctx.strokeRect(x0, Z(gapMm), Math.max(2, lb * sc2),
+                     (gapMm - b.clearanceMm) * scZ);
+    }
+  }
+  axisText(ctx, "Y-Z 剖面", split + 8, 14, "#8b949e", "left", 10.5);
+  axisText(ctx, bActive(b) ? `寬 ${b.widthIn.toFixed(2)}"` : "無擋板",
+           w - 8, 14, "#8b949e", "right", 10);
+  axisText(ctx, "300 噴嘴 25.4mm", cx2, h - 6, "#e3b341", "center", 9.5);
 }
 
 // =====================================================================
@@ -827,6 +1245,7 @@ function frame(now) {
   if (sinceBurst > 0.12) { fireBurst(st); sinceBurst = 0; }
   const stats = burst.stats;
 
+  if (previewOf) drawBafflePreview(previewOf);
   drawLine(st);
   drawGap(st);
   drawTraj();
@@ -883,6 +1302,137 @@ document.getElementById("reset").addEventListener("click", () => {
   sinceBurst = 1e9;
 });
 
+// =====================================================================
+// 擋板設計面板
+// =====================================================================
+let previewOf = null;        // 目前預覽中的設計（每幀重繪以支援視窗縮放）
+
+const BAF_SLIDERS = [
+  ["bClear", "clearanceMm", "vbClear", v => v.toFixed(2) + " mm"],
+  ["bThick", "thicknessMm", "vbThick", v => v.toFixed(1) + " mm"],
+  ["bAngle", "angleDeg", "vbAngle", v => v.toFixed(0) + "°"],
+  ["bWidth", "widthIn", "vbWidth", v => v.toFixed(2) + " 吋"],
+  ["bExtent", "xExtentMm", "vbExtent", v => v.toFixed(0) + " mm"],
+  ["bStages", "nStages", "vbStages", v => v.toFixed(0) + " 片"],
+  ["bPitch", "stagePitchMm", "vbPitch", v => v.toFixed(1) + " mm"],
+  ["bRad", "edgeRadiusMm", "vbRad", v => "R" + v.toFixed(2) + " mm"],
+  ["bVent", "ventRatio", "vbVent", v => (v * 100).toFixed(0) + " %"],
+  ["bTol", "boxTolMm", "vbTol", v => v.toFixed(2) + " mm"],
+];
+const BAF_TOGGLES = [
+  ["bEnable", "enabled"], ["bUp", "upstream"],
+  ["bDown", "downstream"], ["bY", "yPlates"],
+];
+
+function syncBaffleLabels() {
+  // 幾何約束：圓角半徑最大只能等於半厚（完全圓化的鼻端）
+  const rad = document.getElementById("bRad");
+  rad.max = (B.thicknessMm / 2).toFixed(2);
+  clampEdgeRadius(B);
+  rad.value = B.edgeRadiusMm;
+
+  for (const [id, key, out, fmt] of BAF_SLIDERS) {
+    document.getElementById(out).textContent = fmt(B[key]);
+  }
+}
+
+function baffleStatus() {
+  const el = document.getElementById("bStatus");
+  if (!bActive(B)) {
+    el.className = "status";
+    el.innerHTML = "擋板未啟用 —— 間隙為完全開放的 Couette 剪切流。";
+    return;
+  }
+  const seal = solveSealing(B, P.gap, P.plateHalfY);
+  const bounce = K.bounceAmpRef * 1000 * (K.bounceMassRef / P.mass);
+  const coll = collisionCheck(B, bounce);
+  const stale = JSON.stringify(B) !== JSON.stringify(BA);
+
+  const sealTxt = seal.sigma > 0.9 ? "零淨流量循環流"
+                : seal.sigma > 0.3 ? "部分循環" : "仍以貫流為主";
+  const collTxt = coll.level === "safe"
+    ? `餘裕 ${coll.margin.toFixed(2)} mm，安全`
+    : coll.level === "warn"
+      ? `餘裕僅 ${coll.margin.toFixed(2)} mm —— 箱頂稍有翹曲或貼標凸起就會刮到，建議 ≥ ${(coll.req + 0.3).toFixed(2)} mm`
+      : `會撞擊！需要 ${coll.req.toFixed(2)} mm（跳動 ${bounce.toFixed(2)} + 箱高公差 ${B.boxTolMm.toFixed(2)}）`;
+
+  el.className = "status " + (coll.level === "safe" && !stale ? "safe" : stale ? "stale" : coll.level);
+  el.innerHTML =
+    `密封 σ = <b>${seal.sigma.toFixed(3)}</b>（${sealTxt}）　` +
+    `淨流量 <b>${((1 - seal.sigma) * 100).toFixed(1)}%</b>　` +
+    `脈衝 ×<b>${seal.pulse.toFixed(3)}</b><br>` +
+    `橫向密封 σ_y = <b>${seal.sigmaY.toFixed(3)}</b>　` +
+    `逸流半長 <b>${(seal.latHalf * 1000).toFixed(1)} mm</b>　` +
+    `前緣亂流 <b>${(seal.turb * 100).toFixed(1)}%·U</b>` +
+    (seal.turb > 0.04 ? "（圓角不足，分離渦流會落在噴印區）" : "") + "<br>" +
+    `機械餘裕：${collTxt}` +
+    (stale ? "<br><b>設計尚未套用</b> —— 按「套用並模擬」生效。" : "");
+}
+
+for (const [id, key] of BAF_TOGGLES) {
+  const el = document.getElementById(id);
+  el.checked = B[key];
+  el.addEventListener("change", () => { B[key] = el.checked; baffleStatus(); });
+}
+for (const [id, key, , ] of BAF_SLIDERS) {
+  const el = document.getElementById(id);
+  el.value = B[key];
+  el.addEventListener("input", () => {
+    B[key] = Number(el.value);
+    syncBaffleLabels();
+    baffleStatus();
+  });
+}
+
+document.getElementById("bPreview").addEventListener("click", () => {
+  previewOf = Object.assign({}, B);
+  baffleStatus();
+});
+
+document.getElementById("bApply").addEventListener("click", () => {
+  BA = Object.assign({}, B);
+  previewOf = Object.assign({}, B);
+  sinceBurst = 1e9;                       // 立即以新設計重算墨滴
+  baffleStatus();
+});
+
+document.getElementById("bZero").addEventListener("click", () => {
+  const btn = document.getElementById("bZero");
+  const el = document.getElementById("bStatus");
+  if (!bActive(B) || bSides(B) < 2) {
+    el.className = "status warn";
+    el.innerHTML = bActive(B)
+      ? "只有單側擋板 —— 腔體不封閉，無法形成零淨流量回流，不存在零飄移點。"
+      : "請先啟用擋板。";
+    return;
+  }
+  btn.textContent = "⌛ 求解中…";
+  btn.disabled = true;
+  // 讓瀏覽器先畫出忙碌狀態再開始運算
+  setTimeout(() => {
+    const c = solveZeroDrift();
+    btn.textContent = "⌖ 求零飄移間隙";
+    btn.disabled = false;
+    if (c === null) {
+      el.className = "status warn";
+      el.innerHTML =
+        "0.3~3.0 mm 區間內飄移未變號 —— 無零點。試著調整內腔長度、片數或斜角。";
+      return;
+    }
+    B.clearanceMm = Math.round(c * 100) / 100;
+    document.getElementById("bClear").value = B.clearanceMm;
+    syncBaffleLabels();
+    previewOf = Object.assign({}, B);
+    baffleStatus();
+    document.getElementById("bStatus").innerHTML +=
+      `<br><b>零飄移下緣間隙 = ${c.toFixed(3)} mm</b>` +
+      `（Δx ≈ ${meanDriftAt(c).toFixed(2)} µm）—— 已填入滑桿，按「套用並模擬」生效。`;
+  }, 30);
+});
+
 rebuildNozzles();
+syncBaffleLabels();
+baffleStatus();
+previewOf = Object.assign({}, B);
 requestAnimationFrame(frame);
 </script>

@@ -16,10 +16,13 @@ from pathlib import Path
 
 import numpy as np
 
+from .baffle import BaffleParams, check_collision
 from .belt import BeltKinematics
 from .config import SimParams
 from .simulate import (
+    find_zero_drift_clearance,
     fire_burst,
+    sweep_baffle_clearance,
     steady_fire_time,
     sweep_over_cycle,
     sweep_parameter,
@@ -36,8 +39,27 @@ SWEEP_FIELDS = {
 }
 
 
+def build_baffle(args) -> BaffleParams:
+    return BaffleParams(
+        enabled=args.baffle,
+        upstream=not args.no_upstream,
+        downstream=not args.no_downstream,
+        y_end_plates=not args.no_y_plates,
+        clearance_mm=args.clearance,
+        thickness_mm=args.thickness,
+        angle_deg=args.angle,
+        width_in=args.baffle_width,
+        x_extent_mm=args.x_extent,
+        n_stages=args.stages,
+        stage_pitch_mm=args.stage_pitch,
+        edge_radius_mm=args.edge_radius,
+        vent_ratio=args.vent,
+    )
+
+
 def build_params(args) -> SimParams:
     return SimParams(
+        baffle=build_baffle(args),
         belt_speed_m_min=args.speed,
         box_mass_kg=args.mass,
         gap_mm=args.gap,
@@ -54,10 +76,11 @@ def main(argv=None) -> int:
     ap = argparse.ArgumentParser(
         description="產線風速風場模擬觀測器 — 熱發泡噴碼墨滴飄移模擬",
     )
-    ap.add_argument("--scenario", choices=["baseline", "cycle", "startstop", "all"],
+    ap.add_argument("--scenario",
+                    choices=["baseline", "cycle", "startstop", "baffle", "all"],
                     default=None, help="要執行的場景")
-    ap.add_argument("--sweep", choices=sorted(SWEEP_FIELDS), default=None,
-                    help="參數掃描")
+    ap.add_argument("--sweep", choices=sorted(SWEEP_FIELDS) + ["clearance"],
+                    default=None, help="參數掃描")
     ap.add_argument("--outdir", type=Path, default=Path("output"), help="圖表輸出目錄")
 
     ap.add_argument("--speed", type=float, default=350.0, help="產線速度 m/min (0~350)")
@@ -71,6 +94,26 @@ def main(argv=None) -> int:
     ap.add_argument("--eject", type=float, default=8.0, help="噴發初速 m/s")
     ap.add_argument("--fire-hz", type=float, default=15000.0, help="噴發頻率 Hz")
     ap.add_argument("--cycle-samples", type=int, default=48, help="循環掃描的取樣數")
+
+    g = ap.add_argument_group("導風擋板 / 擾流板")
+    g.add_argument("--baffle", action="store_true", help="啟用擋板")
+    g.add_argument("--no-upstream", action="store_true", help="移除上游側擋板")
+    g.add_argument("--no-downstream", action="store_true", help="移除下游側擋板")
+    g.add_argument("--no-y-plates", action="store_true", help="移除 Y 端板")
+    g.add_argument("--clearance", type=float, default=1.5,
+                   help="下緣與箱面的間隙 mm (0.3~3.0)")
+    g.add_argument("--thickness", type=float, default=1.0, help="擋板厚度 mm")
+    g.add_argument("--angle", type=float, default=20.0, help="斜角 度 (0~60)")
+    g.add_argument("--baffle-width", type=float, default=1.25,
+                   help="擋板 Y 向寬度 吋 (1.0~1.5)")
+    g.add_argument("--x-extent", type=float, default=25.0, help="X 向內腔長度 mm")
+    g.add_argument("--stages", type=int, default=2, help="每側串列片數")
+    g.add_argument("--stage-pitch", type=float, default=2.5, help="片間距 mm")
+    g.add_argument("--edge-radius", type=float, default=0.3,
+                   help="前緣圓角半徑 mm (<= 厚度/2)")
+    g.add_argument("--vent", type=float, default=0.0, help="洩壓孔面積比 (0~0.3)")
+    g.add_argument("--solve-zero-drift", action="store_true",
+                   help="求解使淨飄移為零的下緣間隙")
 
     args = ap.parse_args(argv)
     if args.scenario is None and args.sweep is None:
@@ -116,7 +159,36 @@ def main(argv=None) -> int:
         belt = BeltKinematics(params)
         written.append(plots.plot_startstop(params, belt, outdir))
 
-    if args.sweep:
+    if args.scenario in ("baffle", "all"):
+        if not params.baffle.active:
+            print(">> 擋板場景需要 --baffle 才會啟用，略過")
+        else:
+            print(">> 擋板設計預覽與效果對照")
+            belt = BeltKinematics(params)
+            print(plots.design_summary_text(params, params.gap))
+            coll = check_collision(params.baffle, belt.bounce_amplitude_mm)
+            print(f"  機械餘裕      : {coll.message}")
+            print()
+            written.append(plots.plot_baffle_preview(params, outdir))
+            written.append(plots.plot_baffle_comparison(params, outdir))
+            sw = sweep_baffle_clearance(params)
+            written.append(plots.plot_clearance_sweep(sw, outdir))
+
+    if args.solve_zero_drift:
+        print(">> 求解零飄移的擋板下緣間隙")
+        sol = find_zero_drift_clearance(params)
+        print(f"   {sol.note}")
+        print()
+
+    if args.sweep == "clearance":
+        print(">> 擋板下緣間隙掃描")
+        sw = sweep_baffle_clearance(params)
+        for c, sg, d in zip(sw.clearance_mm, sw.sigma, sw.drift_x_um):
+            print(f"   {c:5.2f} mm  σ={sg:.3f}  Δx={d:+8.1f} µm"
+                  f"  ({d/(params.nozzle_pitch*1e6):+.3f} 個點距)")
+        print()
+        written.append(plots.plot_clearance_sweep(sw, outdir))
+    elif args.sweep:
         field, values = SWEEP_FIELDS[args.sweep]
         print(f">> 參數掃描: {field}  ({len(values)} 點)")
         sw = sweep_parameter(params, field, values)
