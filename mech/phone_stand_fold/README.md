@@ -25,6 +25,7 @@
 | `STEP/sheet/*.step` | 鈑金件 |
 | `STEP/printed/*.step`、`STL/`、`3MF/` | 列印件，已經擺好列印方向（Bambu A1） |
 | `3MF/A1_plate_all_parts.3mf` | **A1 整盤列印檔**：5 個列印件已經擺好方向和位置，各自是獨立物件，拖進 Bambu Studio 選 PETG 就能切片列印 |
+| `viewer/phone_stand_viewer.html` | **互動 3D 審圖網頁**（單一檔案，用瀏覽器打開）：逐件或依分類切換顯示、拉轉軸滑桿或選預設姿勢、點零件看材質／重量／尺寸。用 `src/tools/export_viewer.py` 和 `src/tools/build_viewer.py` 重新產生 |
 | `GLB/phone_stand_fold.glb` | 網頁／手機預覽用 |
 | `src/lib/dims.py` | 所有尺寸參數 |
 | `checks/` | 干涉檢查、規格檢查 |

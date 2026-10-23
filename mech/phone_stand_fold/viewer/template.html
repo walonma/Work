@@ -1,0 +1,406 @@
+<meta charset="utf-8">
+<title>折疊手機支架 3D 審圖</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&family=Noto+Sans+TC:wght@400;500;700&display=swap">
+<style>
+/* Layout: review bench. Full-height 3D viewport on the left, parts schedule + pose controls in a right rail; stacks on phones. */
+:root {
+  --bg: #eef1f4;
+  --panel: #ffffff;
+  --ink: #1c232b;
+  --muted: #5d6874;
+  --line: #d5dbe1;
+  --accent: #1d6fd8;
+  --accent-soft: #dbe8fa;
+  --viewport: #e4e9ee;
+  --grid: #c3ccd5;
+  --font-ui: "IBM Plex Sans", "Noto Sans TC", "PingFang TC", "Microsoft JhengHei", system-ui, sans-serif;
+  --font-data: "IBM Plex Mono", "Noto Sans TC", ui-monospace, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #12171c; --panel: #192027; --ink: #e3e8ed; --muted: #95a1ad; --line: #2b343e;
+    --accent: #5b9cf0; --accent-soft: #1e3350; --viewport: #0f1418; --grid: #2a333c; color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #12171c; --panel: #192027; --ink: #e3e8ed; --muted: #95a1ad; --line: #2b343e;
+  --accent: #5b9cf0; --accent-soft: #1e3350; --viewport: #0f1418; --grid: #2a333c; color-scheme: dark;
+}
+[hidden] { display: none !important; }
+html, body { height: 100%; }
+body {
+  background: var(--bg); color: var(--ink); font-family: var(--font-ui); font-size: 14px;
+  display: grid; grid-template-columns: minmax(0, 1fr) 340px; grid-template-rows: auto minmax(0, 1fr);
+  height: 100%; overflow: hidden;
+}
+header {
+  grid-column: 1 / -1; display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 16px;
+  padding-block: 12px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
+  border-bottom: 1px solid var(--line); background: var(--panel);
+}
+header h1 { margin: 0; font-size: 17px; font-weight: 600; letter-spacing: 0.01em; text-wrap: balance; }
+header .meta { color: var(--muted); font-family: var(--font-data); font-size: 12px; }
+#stage { position: relative; min-width: 0; min-height: 0; background: var(--viewport); }
+#stage canvas { display: block; width: 100%; height: 100%; touch-action: none; }
+.hud {
+  position: absolute; left: 12px; bottom: 12px; display: flex; flex-wrap: wrap; gap: 6px;
+  margin-left: env(safe-area-inset-left, 0px);
+}
+.hud button, .seg button, .row-actions button {
+  font: 500 12px var(--font-ui); color: var(--ink); background: var(--panel); border: 1px solid var(--line);
+  border-radius: 6px; padding: 6px 10px; cursor: pointer;
+}
+.hud button[aria-pressed="true"], .seg button[aria-pressed="true"] { background: var(--accent-soft); border-color: var(--accent); color: var(--accent); }
+button:focus-visible, input:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.readout {
+  position: absolute; right: 12px; top: 12px; background: var(--panel); border: 1px solid var(--line); border-radius: 8px;
+  padding: 8px 10px; font-family: var(--font-data); font-size: 12px; display: grid; grid-template-columns: auto auto; gap: 2px 12px;
+  margin-right: env(safe-area-inset-right, 0px); font-variant-numeric: tabular-nums;
+}
+.readout dt { color: var(--muted); }
+.readout dd { margin: 0; text-align: right; }
+.hint { position: absolute; left: 12px; top: 12px; color: var(--muted); font-size: 12px; margin-left: env(safe-area-inset-left, 0px); }
+aside {
+  min-height: 0; overflow-y: auto; background: var(--panel); border-left: 1px solid var(--line);
+  padding-block: 14px; padding-left: 16px; padding-right: max(16px, env(safe-area-inset-right, 0px));
+  display: flex; flex-direction: column; gap: 18px;
+}
+section h2 { margin: 0 0 8px; font-size: 11px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
+.seg { display: flex; flex-wrap: wrap; gap: 6px; }
+.slider { display: grid; grid-template-columns: 56px minmax(0, 1fr) 52px; align-items: center; gap: 8px; margin-top: 8px; }
+.slider label { font-size: 13px; }
+.slider output { font-family: var(--font-data); font-size: 12px; text-align: right; font-variant-numeric: tabular-nums; }
+.slider input { width: 100%; accent-color: var(--accent); }
+.group { border-top: 1px solid var(--line); padding-top: 8px; margin-top: 8px; }
+.group:first-of-type { border-top: 0; margin-top: 0; padding-top: 0; }
+.group-head { display: flex; align-items: center; gap: 8px; font-weight: 600; font-size: 13px; }
+.group-head .count { color: var(--muted); font-weight: 400; font-family: var(--font-data); font-size: 12px; }
+.group-head input { margin: 0; }
+.part { display: grid; grid-template-columns: 18px 12px minmax(0, 1fr) auto; align-items: center; gap: 8px; padding: 5px 6px; border-radius: 6px; cursor: pointer; }
+.part:hover { background: var(--bg); }
+.part.sel { background: var(--accent-soft); }
+.part input { margin: 0; }
+.swatch { width: 12px; height: 12px; border-radius: 3px; border: 1px solid var(--line); }
+.part .name { font-size: 13px; overflow-wrap: anywhere; }
+.part .mass { font-family: var(--font-data); font-size: 11px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.row-actions { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+#info { font-size: 13px; display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 4px 12px; }
+#info dt { color: var(--muted); }
+#info dd { margin: 0; font-family: var(--font-data); font-size: 12px; overflow-wrap: anywhere; }
+#info .empty { grid-column: 1 / -1; color: var(--muted); }
+.loading { position: absolute; inset: 0; display: grid; place-items: center; color: var(--muted); font-size: 13px; }
+@media (max-width: 760px) {
+  body { grid-template-columns: minmax(0, 1fr); grid-template-rows: auto 58vh auto; height: auto; overflow: auto; }
+  aside { border-left: 0; border-top: 1px solid var(--line); overflow: visible; padding-left: max(16px, env(safe-area-inset-left, 0px)); }
+  .readout { font-size: 11px; }
+}
+@media (prefers-reduced-motion: reduce) { * { scroll-behavior: auto !important; } }
+</style>
+
+<header>
+  <h1>折疊式手機支架 · 3D 審圖</h1>
+  <span class="meta">mech/phone_stand_fold · 底座 230 × 140 · DIKE DUF201 風扇 · 單位 mm</span>
+</header>
+
+<main id="stage" aria-label="3D 檢視區">
+  <div class="loading" id="loading">正在載入 3D 模型…</div>
+  <div class="hint">拖曳旋轉 · 右鍵或雙指平移 · 滾輪縮放 · 點零件看資料</div>
+  <dl class="readout" aria-live="polite">
+    <dt>手機中心高</dt><dd id="r-h">–</dd>
+    <dt>手機仰角</dt><dd id="r-t">–</dd>
+    <dt>前緣外伸</dt><dd id="r-y">–</dd>
+  </dl>
+  <div class="hud">
+    <button id="v-iso" type="button">等角</button>
+    <button id="v-front" type="button">正視</button>
+    <button id="v-side" type="button">側視</button>
+    <button id="v-top" type="button">俯視</button>
+    <button id="v-xray" type="button" aria-pressed="false">半透明</button>
+    <button id="v-edges" type="button" aria-pressed="true">輪廓線</button>
+  </div>
+</main>
+
+<aside>
+  <section>
+    <h2>姿勢</h2>
+    <div class="seg" id="presets"></div>
+    <div id="sliders"></div>
+  </section>
+  <section>
+    <h2>料件</h2>
+    <div id="parts"></div>
+    <div class="row-actions">
+      <button id="a-all" type="button">全部顯示</button>
+      <button id="a-iso" type="button">只顯示選取件</button>
+      <button id="a-prod" type="button">只看產品（隱藏參考）</button>
+    </div>
+  </section>
+  <section>
+    <h2>選取料件</h2>
+    <dl id="info"><dd class="empty">在清單或 3D 圖上點一個零件。</dd></dl>
+  </section>
+</aside>
+
+<script id="model-data" type="application/json">/*DATA*/</script>
+<script type="importmap">
+{ "imports": {
+  "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+  "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+} }
+</script>
+<script type="module">
+import * as THREE from "three";
+import { OrbitControls } from "three/addons/controls/OrbitControls.js";
+
+const DATA = JSON.parse(document.getElementById("model-data").textContent);
+const D = DATA.dims;
+const GROUPS = [
+  ["sheet", "鈑金件"], ["printed", "列印件（A1）"], ["hardware", "標準件"], ["ref", "參考外形"],
+];
+const DEG = Math.PI / 180;
+
+// ---------------------------------------------------------------- scene
+const stage = document.getElementById("stage");
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+stage.prepend(renderer.domElement);
+const scene = new THREE.Scene();
+const camera = new THREE.PerspectiveCamera(32, 1, 5, 5000);
+camera.up.set(0, 0, 1);
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.enableDamping = true;
+controls.target.set(-20, 0, 80);
+scene.add(new THREE.HemisphereLight(0xffffff, 0x8a939c, 1.4));
+const sun = new THREE.DirectionalLight(0xffffff, 1.6);
+sun.position.set(-300, -500, 700);
+scene.add(sun);
+const fill = new THREE.DirectionalLight(0xffffff, 0.5);
+fill.position.set(400, 300, 200);
+scene.add(fill);
+const grid = new THREE.GridHelper(600, 30);
+grid.rotation.x = Math.PI / 2;
+scene.add(grid);
+
+function cssVar(name) { return getComputedStyle(document.documentElement).getPropertyValue(name).trim(); }
+function applyTheme() {
+  scene.background = new THREE.Color(cssVar("--viewport"));
+  const g = new THREE.Color(cssVar("--grid"));
+  grid.material.color = g;
+  grid.material.vertexColors = false;
+}
+applyTheme();
+matchMedia("(prefers-color-scheme: dark)").addEventListener("change", applyTheme);
+new MutationObserver(applyTheme).observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
+
+function decode(b64, Type) {
+  const bin = atob(b64), buf = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) buf[i] = bin.charCodeAt(i);
+  return new Type(buf.buffer);
+}
+
+const parts = DATA.parts.map((p) => {
+  let geo = new THREE.BufferGeometry();
+  geo.setAttribute("position", new THREE.BufferAttribute(decode(p.pos, Float32Array), 3));
+  geo.setIndex(new THREE.BufferAttribute(decode(p.idx, Uint32Array), 1));
+  geo = geo.toNonIndexed();
+  geo.computeVertexNormals();
+  const isRef = p.group === "ref";
+  const mat = new THREE.MeshStandardMaterial({
+    color: p.color, metalness: p.group === "sheet" || p.group === "hardware" ? 0.35 : 0.0,
+    roughness: p.group === "printed" ? 0.75 : 0.5, transparent: isRef, opacity: isRef ? 0.35 : 1,
+    depthWrite: !isRef, side: THREE.DoubleSide,
+  });
+  const mesh = new THREE.Mesh(geo, mat);
+  mesh.matrixAutoUpdate = false;
+  const edges = new THREE.LineSegments(new THREE.EdgesGeometry(geo, 28),
+    new THREE.LineBasicMaterial({ color: 0x14181c, transparent: true, opacity: isRef ? 0.15 : 0.45 }));
+  edges.matrixAutoUpdate = false;
+  mesh.userData.part = p;
+  scene.add(mesh, edges);
+  return { ...p, mesh, edges, mat, baseColor: new THREE.Color(p.color), visible: true };
+});
+document.getElementById("loading").hidden = true;
+
+// ---------------------------------------------------------------- kinematics (same chain as lib/dims.py)
+const pose = { shoulder: D.SHOULDER, elbow: D.ELBOW, head: D.HEAD, rotate: 0, jaw: 76 };
+const T = (x, y, z) => new THREE.Matrix4().makeTranslation(x, y, z);
+const RX = (d) => new THREE.Matrix4().makeRotationX(d * DEG);
+const RY = (d) => new THREE.Matrix4().makeRotationY(d * DEG);
+function rotX([x, y, z], d) { const a = d * DEG; return [x, y * Math.cos(a) - z * Math.sin(a), y * Math.sin(a) + z * Math.cos(a)]; }
+const add = (a, b) => a.map((v, i) => v + b[i]);
+
+function frames() {
+  const psi = pose.shoulder - pose.elbow;
+  const h1 = D.H1, h2 = add(h1, rotX([0, D.L1, 0], pose.shoulder)), h3 = add(h2, rotX([0, -D.L2, 0], psi));
+  const lower = T(...h1).multiply(RX(pose.shoulder));
+  const upper = T(...h2).multiply(RX(psi));
+  const head = T(...h3).multiply(RX(psi + pose.head));
+  const cradle = head.clone().multiply(T(0, D.HEAD_AXIS_OFF, D.HEAD_PLATE_TOP - 16)).multiply(RX(-90)).multiply(RY(pose.rotate));
+  return {
+    world: new THREE.Matrix4(), lower, upper, head, cradle,
+    jaw_right: cradle.clone().multiply(T(pose.jaw / 2, 0, 0)),
+    jaw_left: cradle.clone().multiply(T(-pose.jaw / 2, 0, 0)),
+    tilt: 90 - (psi + pose.head),
+  };
+}
+
+const rH = document.getElementById("r-h"), rT = document.getElementById("r-t"), rY = document.getElementById("r-y");
+function update() {
+  const F = frames();
+  for (const p of parts) {
+    p.mesh.matrix.copy(F[p.frame]);
+    p.edges.matrix.copy(F[p.frame]);
+    p.mesh.matrixWorldNeedsUpdate = p.edges.matrixWorldNeedsUpdate = true;
+  }
+  const c = new THREE.Vector3(...D.PHONE_C).applyMatrix4(F.cradle);
+  rH.textContent = `${c.z.toFixed(0)} mm`;
+  rT.textContent = `${F.tilt.toFixed(0)}°`;
+  const over = -D.BASE_D / 2 - c.y;
+  rY.textContent = over > 0 ? `${over.toFixed(0)} mm` : "在底座內";
+}
+
+// ---------------------------------------------------------------- pose UI
+const SL = [
+  ["shoulder", "肩部", D.SHOULDER_RANGE, "°"], ["elbow", "肘部", D.ELBOW_RANGE, "°"],
+  ["head", "頭部", D.HEAD_RANGE, "°"], ["rotate", "直／橫", [-90, 90], "°"], ["jaw", "夾爪", [D.JAW_MIN, D.JAW_MAX], " mm"],
+];
+const sliders = {};
+const slWrap = document.getElementById("sliders");
+for (const [k, label, [lo, hi], unit] of SL) {
+  const row = document.createElement("div");
+  row.className = "slider";
+  row.innerHTML = `<label for="s-${k}">${label}</label><input id="s-${k}" type="range" min="${lo}" max="${hi}" step="1"><output for="s-${k}"></output>`;
+  const input = row.querySelector("input"), out = row.querySelector("output");
+  input.addEventListener("input", () => { pose[k] = +input.value; out.textContent = input.value + unit; markPreset(null); update(); });
+  sliders[k] = { input, out, unit };
+  slWrap.append(row);
+}
+function syncSliders() { for (const k in sliders) { sliders[k].input.value = pose[k]; sliders[k].out.textContent = pose[k] + sliders[k].unit; } }
+
+const PRESETS = [
+  ["use", "使用中", { shoulder: D.SHOULDER, elbow: D.ELBOW, head: D.HEAD, rotate: 0, jaw: 76 }],
+  ["folded", "收折裝盒", { shoulder: 0, elbow: 0, head: 0, rotate: 0, jaw: D.JAW_MIN }],
+  ["low", "低", { shoulder: 30, elbow: 60, head: 105, rotate: 0, jaw: 76 }],
+  ["high", "高", { shoulder: 70, elbow: 80, head: 85, rotate: 0, jaw: 76 }],
+  ["landscape", "橫放", { shoulder: D.SHOULDER, elbow: D.ELBOW, head: D.HEAD, rotate: 90, jaw: 76 }],
+];
+const presetWrap = document.getElementById("presets");
+const presetBtns = {};
+let anim = null;
+for (const [key, label, values] of PRESETS) {
+  const b = document.createElement("button");
+  b.type = "button"; b.textContent = label; b.setAttribute("aria-pressed", "false");
+  b.addEventListener("click", () => { goTo(values); markPreset(key); });
+  presetBtns[key] = b; presetWrap.append(b);
+}
+function markPreset(key) { for (const k in presetBtns) presetBtns[k].setAttribute("aria-pressed", String(k === key)); }
+const reduced = matchMedia("(prefers-reduced-motion: reduce)").matches;
+function goTo(target) {
+  const from = { ...pose }, t0 = performance.now(), dur = reduced ? 0 : 700;
+  anim = (now) => {
+    const u = dur ? Math.min(1, (now - t0) / dur) : 1, e = u < 0.5 ? 2 * u * u : 1 - Math.pow(-2 * u + 2, 2) / 2;
+    for (const k in target) pose[k] = Math.round((from[k] + (target[k] - from[k]) * e) * 10) / 10;
+    syncSliders(); update();
+    if (u >= 1) anim = null;
+  };
+}
+
+// ---------------------------------------------------------------- parts UI
+const listWrap = document.getElementById("parts");
+const rows = {};
+let selected = null;
+for (const [g, gLabel] of GROUPS) {
+  const members = parts.filter((p) => p.group === g);
+  const box = document.createElement("div");
+  box.className = "group";
+  const head = document.createElement("label");
+  head.className = "group-head";
+  head.innerHTML = `<input type="checkbox" id="g-${g}" checked> ${gLabel} <span class="count">${members.length} 件</span>`;
+  const gInput = head.querySelector("input");
+  gInput.addEventListener("change", () => { members.forEach((p) => setVisible(p, gInput.checked)); });
+  box.append(head);
+  for (const p of members) {
+    const row = document.createElement("div");
+    row.className = "part";
+    row.innerHTML = `<input type="checkbox" id="p-${p.key}" checked aria-label="顯示 ${p.label}"><span class="swatch" style="background:${p.color}"></span><span class="name">${p.label}</span><span class="mass">${p.mass ? p.mass + " g" : ""}</span>`;
+    const cb = row.querySelector("input");
+    cb.addEventListener("click", (e) => e.stopPropagation());
+    cb.addEventListener("change", () => setVisible(p, cb.checked));
+    row.addEventListener("click", () => select(p));
+    rows[p.key] = { row, cb, gInput, members };
+    box.append(row);
+  }
+  listWrap.append(box);
+}
+
+function syncGroup(p) {
+  const r = rows[p.key];
+  const on = r.members.filter((m) => m.visible).length;
+  r.gInput.checked = on === r.members.length;
+  r.gInput.indeterminate = on > 0 && on < r.members.length;
+}
+function setVisible(p, v) {
+  p.visible = v; p.mesh.visible = v; p.edges.visible = v && edgesOn;
+  rows[p.key].cb.checked = v; syncGroup(p);
+}
+
+const info = document.getElementById("info");
+function select(p) {
+  selected = p;
+  for (const q of parts) {
+    rows[q.key].row.classList.toggle("sel", q === p);
+    q.mat.emissive = new THREE.Color(q === p ? 0x1d6fd8 : 0x000000);
+    q.mat.emissiveIntensity = q === p ? 0.45 : 0;
+  }
+  if (!p) { info.innerHTML = '<dd class="empty">在清單或 3D 圖上點一個零件。</dd>'; return; }
+  const gLabel = GROUPS.find(([g]) => g === p.group)[1];
+  info.innerHTML = `<dt>名稱</dt><dd>${p.label}</dd><dt>分類</dt><dd>${gLabel}</dd><dt>材質</dt><dd>${p.material}</dd>` +
+    `<dt>外形</dt><dd>${p.size.join(" × ")} mm</dd>` + (p.mass ? `<dt>約重</dt><dd>${p.mass} g</dd>` : "") +
+    (p.group === "sheet" || p.group === "printed" ? `<dt>檔案</dt><dd>STEP/${p.group}/${p.key}.step${p.group === "printed" ? `<br>3MF/${p.key}.3mf` : ""}</dd>` : "");
+}
+
+document.getElementById("a-all").addEventListener("click", () => parts.forEach((p) => setVisible(p, true)));
+document.getElementById("a-iso").addEventListener("click", () => { if (selected) parts.forEach((p) => setVisible(p, p === selected)); });
+document.getElementById("a-prod").addEventListener("click", () => parts.forEach((p) => setVisible(p, p.group !== "ref")));
+
+// picking (click without drag)
+const ray = new THREE.Raycaster();
+let down = null;
+renderer.domElement.addEventListener("pointerdown", (e) => { down = [e.clientX, e.clientY]; });
+renderer.domElement.addEventListener("pointerup", (e) => {
+  if (!down || Math.hypot(e.clientX - down[0], e.clientY - down[1]) > 4) return;
+  const r = renderer.domElement.getBoundingClientRect();
+  ray.setFromCamera(new THREE.Vector2(((e.clientX - r.left) / r.width) * 2 - 1, -((e.clientY - r.top) / r.height) * 2 + 1), camera);
+  const hit = ray.intersectObjects(parts.filter((p) => p.visible).map((p) => p.mesh))[0];
+  select(hit ? hit.object.userData.part : null);
+});
+
+// ---------------------------------------------------------------- view buttons
+const VIEWS = { iso: [-1, -1.35, 0.85], front: [0, -1, 0.02], side: [1, 0, 0.02], top: [0, -0.001, 1] };
+function view(dir) {
+  const d = new THREE.Vector3(...dir).normalize();
+  camera.position.copy(controls.target).addScaledVector(d, 820);
+}
+for (const k in VIEWS) document.getElementById(`v-${k}`).addEventListener("click", () => view(VIEWS[k]));
+let xray = false, edgesOn = true;
+document.getElementById("v-xray").addEventListener("click", (e) => {
+  xray = !xray; e.currentTarget.setAttribute("aria-pressed", String(xray));
+  for (const p of parts) if (p.group !== "ref") { p.mat.transparent = xray; p.mat.opacity = xray ? 0.4 : 1; p.mat.depthWrite = !xray; p.mat.needsUpdate = true; }
+});
+document.getElementById("v-edges").addEventListener("click", (e) => {
+  edgesOn = !edgesOn; e.currentTarget.setAttribute("aria-pressed", String(edgesOn));
+  for (const p of parts) p.edges.visible = edgesOn && p.visible;
+});
+
+// ---------------------------------------------------------------- loop
+function resize() {
+  const w = stage.clientWidth, h = stage.clientHeight;
+  renderer.setSize(w, h, false); camera.aspect = w / h; camera.updateProjectionMatrix();
+}
+new ResizeObserver(resize).observe(stage);
+view(VIEWS.iso); syncSliders(); markPreset("use"); update(); resize();
+renderer.setAnimationLoop((now) => { if (anim) anim(now); controls.update(); renderer.render(scene, camera); });
+</script>
