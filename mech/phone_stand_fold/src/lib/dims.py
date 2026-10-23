@@ -10,23 +10,24 @@ T = 1.6                    # SPCC sheet thickness
 BEND_R = 1.6               # inner bend radius
 
 # Base tray (SPCC 1.6, one blank: tray + fan shelf + hinge ears)
-BASE_W = 280.0             # X
-BASE_D = 150.0             # Y
+BASE_W = 230.0             # X (tray only, the fan trough is outboard)
+BASE_D = 140.0             # Y
 BASE_TOP = 14.0            # top surface
 PAD_T = 2.0                # silicone pad under the hems
 HEM_W = 8.0                # inward hem under the flanges, carries the pad
 
-# Fan shelf: the fan's own clamp grips it; the clamp's lower jaw (50-60 mm)
-# rests on the desk, so the fan props the stand up on that side.
-SHELF_BOTTOM = 65.0
-SHELF_THICK = 18.0         # clamp opens to 30 mm
-SHELF_TOP = SHELF_BOTTOM + SHELF_THICK
-SHELF_DEPTH = 70.0         # overhang beyond the base edge
-SHELF_W = 100.0            # Y
+# Fan plate for a DIKE DUF201 clip fan (spring clip, opens 46 mm, 226 g).
+# The left edge folds down, runs out along the desk and back up as a vertical
+# plate. The clip slides down over the plate: the outer jaw tip lands on the
+# desk, the inner jaw drops into the trough, so the fan props that side.
+FAN_PLATE_TOP = 40.0       # plate top (hemmed edge) above the desk
+TROUGH_GAP = 20.0          # room for the inner jaw between tray flange and plate
+HEM_DROP = 10.0            # closed hem on the plate top edge
+FAN_JAW_T = 12.0           # assumed DUF201 jaw thickness (reference model only)
 
 # Arm: three friction pivots (M5 shoulder bolt + disc springs, set at the factory)
 ARM_X = 0.0
-H1 = (0.0, -52.0, 26.0)    # shoulder pivot on the base ears
+H1 = (0.0, -48.0, 26.0)    # shoulder pivot on the base ears
 L1 = 110.0                 # lower arm, pivot to pivot
 L2 = 95.0                  # upper arm, pivot to pivot
 UP_W = 32.4                # upper arm channel outer width
@@ -50,7 +51,7 @@ HEAD_W = 36.0
 SHOULDER = 60.0
 ELBOW = 105.0
 HEAD = 120.0
-SHOULDER_RANGE = (0.0, 90.0)
+SHOULDER_RANGE = (0.0, 70.0)
 ELBOW_RANGE = (0.0, 165.0)
 HEAD_RANGE = (0.0, 170.0)
 
@@ -73,13 +74,13 @@ SPRING_PIN_X = 26.0
 SPRING_PIN_D = 2.0
 
 # Cable organiser (USB-C charger + 90 cm cable), screwed to PEM nuts in the base
-REEL_X = (54.0, 136.0)
-REEL_Y = (-70.0, 66.0)
+REEL_X = (50.0, 114.0)
+REEL_Y = (-67.0, 67.0)
 REEL_PLATE_T = 4.0
-BOBBIN_C = (95.0, -26.0)
-REEL_HOLES = [(60.0, -62.0), (130.0, -62.0), (60.0, 58.0), (130.0, 58.0)]
+BOBBIN_C = (82.0, -24.0)
+REEL_HOLES = [(56.0, -60.0), (108.0, -60.0), (56.0, 18.0), (108.0, 18.0)]
 CHARGER_IN = (54.0, 34.0, 40.0)
-CHARGER_C = (95.0, 42.0)
+CHARGER_C = (82.0, 42.0)
 
 
 def rot_x(v, deg):

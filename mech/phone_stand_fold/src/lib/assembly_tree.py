@@ -53,7 +53,6 @@ def build(shoulder=SHOULDER, elbow=ELBOW, head=HEAD, rotate=0.0, opening=JAW_AS_
     children = [
         _p(bd.Pos(0, 0, -0.8 * e) * parts.silicone_pad(), "silicone_pad", SILICONE),
         _p(parts.base_plate(), "base_plate", STEEL),
-        _p(bd.Pos(0, 0, 0.4 * e) * parts.shelf_standoffs(), "shelf_standoffs", BLACK),
         _p(bd.Pos(0.6 * e, 0, 0.6 * e) * parts.cable_reel(), "cable_reel", PRINT),
         _p(lo * parts.pivot_bolt(LOW_W + 2 * T + 0.4), "shoulder_pivot", BLACK),
         bd.Pos(0, 0, 0.8 * e) * lower_stage,

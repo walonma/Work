@@ -16,7 +16,6 @@ from lib.geo import bent_xz, box, cyl_x, cyl_y, cyl_z, stadium, stadium_face
 M3, M4, M5 = 3.4, 4.5, 5.5
 PIVOT_HOLE = PIVOT_D + 0.2
 PEM_M4 = 5.4                      # press-in nut hole
-PEM_SO = 4.2                      # press-in standoff hole (M3 x 16)
 INSERT_M5 = 6.4                   # heat-set insert hole
 
 
@@ -34,25 +33,24 @@ def base_plate():
     zb = PAD_T                       # flange bottom (hem underside)
     body = box(-hw, hw, -hd, hd, z0, BASE_TOP)
     g = 0.5
-    sw = SHELF_W / 2 + 2.0           # left flange stops where the shelf rises
-    # down flanges
+    # down flanges with inward hems carrying the silicone pads (front, back, right)
     body += box(-hw + g, hw - g, -hd, -hd + T, zb, z0)
     body += box(-hw + g, hw - g, hd - T, hd, zb, z0)
     body += box(hw - T, hw, -hd + T + g, hd - T - g, zb, z0)
-    for y0, y1 in ((-hd + T + g, -sw), (sw, hd - T - g)):
-        body += box(-hw, -hw + T, y0, y1, zb, z0)
-    # inward hems carrying the silicone pads
     body += box(-hw + g + T, hw - g - T, -hd + T, -hd + T + HEM_W, zb, zb + T)
     body += box(-hw + g + T, hw - g - T, hd - T - HEM_W, hd - T, zb, zb + T)
     body += box(hw - T - HEM_W, hw - T, -hd + T + HEM_W + g, hd - T - HEM_W - g, zb, zb + T)
-    for y0, y1 in ((-hd + T + HEM_W + g, -sw), (sw, hd - T - HEM_W - g)):
-        body += box(-hw + T, -hw + T + HEM_W, y0, y1, zb, zb + T)
-    # fan shelf: wall up from the left edge, closed C-section 18 mm thick
-    xw = -hw + T / 2
-    xo = -hw - SHELF_DEPTH + T / 2
-    pts = [(-hw + 14.0, BASE_TOP - T / 2), (xw, BASE_TOP - T / 2), (xw, SHELF_TOP - T / 2),
-           (xo, SHELF_TOP - T / 2), (xo, SHELF_BOTTOM + T / 2), (-hw - 10.0, SHELF_BOTTOM + T / 2)]
-    body += bent_xz(pts, -SHELF_W / 2, SHELF_W / 2)
+    # left edge: down, out along the desk, up into the fan plate
+    xf = -hw + T / 2                 # tray flange centreline
+    xp = -hw - TROUGH_GAP - T / 2    # fan plate centreline
+    pts = [(-hw + 12.0, BASE_TOP - T / 2), (xf, BASE_TOP - T / 2), (xf, zb + T / 2),
+           (xp, zb + T / 2), (xp, FAN_PLATE_TOP - T / 2)]
+    body += bent_xz(pts, -hd + T + g, hd - T - g)
+    # closed hem folded outward on the plate top edge (no sharp edge)
+    xo = -hw - TROUGH_GAP - T
+    hem = box(xo - T, xo, -hd + T + g, hd - T - g, FAN_PLATE_TOP - HEM_DROP, FAN_PLATE_TOP - T)
+    hem += cyl_y(2 * T, -hd + T + g, hd - T - g, xo, FAN_PLATE_TOP - T)
+    body += hem
     # shoulder ears, bent up out of the plate
     ex0 = LOW_W / 2 + 0.2
     hy = H1[1]
@@ -63,16 +61,9 @@ def base_plate():
         body -= cyl_x(PIVOT_HOLE, xa - 1, xb + 1, hy, H1[2])
         wa, wb = sorted((s * (ex0 + T), s * (ex0 + T + H1[2] - z0 + EAR_W / 2)))
         body -= box(wa, wb, hy - EAR_W / 2 - 0.5, hy + EAR_W / 2 + 0.5, z0 - 1, BASE_TOP + 1)
-    # holes: PEM nuts for the reel, PEM standoffs in the shelf
+    # PEM nuts for the cable reel
     body -= [cyl_z(PEM_M4, z0 - 1, BASE_TOP + 1, x, y) for x, y in REEL_HOLES]
-    for x, y in SHELF_STANDOFFS:
-        body -= cyl_z(M3, SHELF_TOP - T - 1, SHELF_TOP + 1, x, y)
-        body -= _cone_csk(x, y, SHELF_TOP + 0.01, M3, 6.6)
-        body -= cyl_z(PEM_SO, SHELF_BOTTOM - 1, SHELF_BOTTOM + T + 1, x, y)
     return body
-
-
-SHELF_STANDOFFS = [(-200.0, -38.0), (-200.0, 38.0), (-155.0, -38.0), (-155.0, 38.0)]
 
 
 def lower_arm():
@@ -195,15 +186,13 @@ def cable_reel():
 # ---------------------------------------------------------------- purchased / reference
 
 def silicone_pad():
-    """Die-cut 2 mm silicone strips under the hems."""
+    """Die-cut 2 mm silicone strips under the hems and the fan trough."""
     hw, hd = BASE_W / 2, BASE_D / 2
     g = 0.5
-    sw = SHELF_W / 2 + 2.0
     pads = [box(-hw + g + T, hw - g - T, -hd + T, -hd + T + HEM_W, 0.0, PAD_T),
             box(-hw + g + T, hw - g - T, hd - T - HEM_W, hd - T, 0.0, PAD_T),
-            box(hw - T - HEM_W, hw - T, -hd + T + HEM_W + g, hd - T - HEM_W - g, 0.0, PAD_T)]
-    for y0, y1 in ((-hd + T + HEM_W + g, -sw), (sw, hd - T - HEM_W - g)):
-        pads.append(box(-hw + T, -hw + T + HEM_W, y0, y1, 0.0, PAD_T))
+            box(hw - T - HEM_W, hw - T, -hd + T + HEM_W + g, hd - T - HEM_W - g, 0.0, PAD_T),
+            box(-hw - TROUGH_GAP, -hw, -hd + T + g, hd - T - g, 0.0, PAD_T)]
     return bd.Compound(children=pads)
 
 
@@ -220,25 +209,20 @@ def pivot_bolt(width, spacer=None):
     return bolt
 
 
-def shelf_standoffs():
-    return bd.Compound(children=[cyl_z(6.0, SHELF_BOTTOM + T, SHELF_TOP - T, x, y) for x, y in SHELF_STANDOFFS])
-
-
 def phone_ref():
     return box(-38.0, 38.0, FACE_Y - 9.0, FACE_Y, CRADLE_ZB + 4.0, CRADLE_ZB + 4.0 + 160.0)
 
 
 def fan_ref():
-    """Clip fan, 250 mm dia x 80 mm. Its clamp's lower jaw/knob rests on the desk."""
-    xs = -BASE_W / 2 - SHELF_DEPTH
-    clamp = box(xs - 14, xs - 3, -15, 15, 0.0, SHELF_TOP + 8)               # C-frame back
-    clamp += box(xs - 3, xs + 36, -15, 15, SHELF_TOP, SHELF_TOP + 8)        # upper jaw
-    clamp += box(xs - 3, xs + 30, -15, 15, SHELF_BOTTOM - 14, SHELF_BOTTOM - 6)  # lower jaw
-    clamp += cyl_z(10, SHELF_BOTTOM - 6, SHELF_BOTTOM, xs + 18)             # screw pad
-    clamp += cyl_z(8, 6.0, SHELF_BOTTOM - 14, xs + 18)                      # screw
-    clamp += cyl_z(30, 0.0, 6.0, xs + 18)                                   # knob on the desk
-    neck = cyl_z(16, SHELF_TOP + 8, SHELF_TOP + 40, xs + 11)
-    fc = (xs + 11, 0.0, SHELF_TOP + 40 + 125)
-    ring = cyl_y(250, -40, 40, fc[0], fc[2]) - cyl_y(236, -41, 41, fc[0], fc[2])
-    hubp = cyl_y(70, -10, 30, fc[0], fc[2])
-    return clamp + neck + ring + hubp
+    """DIKE DUF201 (approximate): spring clip slid down over the fan plate, head on top."""
+    xp0 = -BASE_W / 2 - TROUGH_GAP - T       # plate inner face
+    xp1 = xp0 - T                            # plate outer face (hem side is thicker)
+    jl, jw, jd = 60.0, 64.0, FAN_JAW_T       # jaw length (Z), width (Y), thickness (X)
+    inner = box(xp0, xp0 + jd, -jw / 2, jw / 2, PAD_T + T, PAD_T + T + jl)
+    outer = box(xp1 - 2 * T - jd, xp1 - 2 * T, -jw / 2, jw / 2, 0.0, jl)
+    hinge = box(xp1 - 2 * T - jd, xp0 + jd, -jw / 2, jw / 2, jl, jl + 18.0)
+    neck = cyl_z(20, jl + 18.0, jl + 40.0, (xp0 + xp1) / 2)
+    fc = ((xp0 + xp1) / 2, 0.0, jl + 40.0 + 75.0)
+    ring = cyl_y(150, -25, 25, fc[0], fc[2]) - cyl_y(138, -26, 26, fc[0], fc[2])
+    hubp = cyl_y(40, -10, 20, fc[0], fc[2])
+    return inner + outer + hinge + neck + ring + hubp

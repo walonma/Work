@@ -24,12 +24,14 @@ def check(name, cond, detail):
     print(("PASS " if cond else "FAIL ") + name + ": " + detail)
 
 
-folded = build(0.0, 0.0, 0.0, refs=False).bounding_box()
+folded = build(0.0, 0.0, 0.0, opening=JAW_MIN, refs=False).bounding_box()
 print(f"INFO folded envelope {folded.size.X:.0f} x {folded.size.Y:.0f} x {folded.size.Z:.0f} mm "
       f"(box inside ~{folded.size.X + 10:.0f} x {folded.size.Y + 10:.0f} x {folded.size.Z + 10:.0f})")
-check("folded arm lower than fan shelf", folded.max.Z <= SHELF_TOP + 3.0, f"top {folded.max.Z:.1f} vs shelf {SHELF_TOP}")
-check("fan clamp fits shelf", SHELF_THICK <= 30 - 5, f"{SHELF_THICK} mm in a 30 mm clamp")
-check("clamp lower jaw reaches the desk", 50.0 <= SHELF_BOTTOM <= 66.0, f"shelf underside {SHELF_BOTTOM} mm for a 50-60 mm jaw")
+DUF201_OPEN = 46.0          # clip opening from the product sheet
+DUF201_JAW_MIN = 45.0       # assumed usable jaw length; the tip must reach the desk
+check("DUF201 clip fits the plate", 2 * T + 1.0 < DUF201_OPEN, f"plate + hem {2 * T:.1f} mm, clip opens {DUF201_OPEN} mm")
+check("inner jaw fits the trough", TROUGH_GAP >= FAN_JAW_T + 4.0, f"gap {TROUGH_GAP} mm for a ~{FAN_JAW_T} mm jaw")
+check("jaw tip reaches the desk", FAN_PLATE_TOP < DUF201_JAW_MIN, f"plate top {FAN_PLATE_TOP} mm vs jaw >= {DUF201_JAW_MIN} mm")
 
 # masses (part frames are fine for mass; CoM taken from the placed assembly)
 lo, up, hd = link_locations()

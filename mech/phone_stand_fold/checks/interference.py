@@ -39,8 +39,8 @@ def clashes(**pose):
 
 
 def poses():
-    yield "folded", dict(shoulder=0.0, elbow=0.0, head=0.0)
-    for sh, psi, tilt in itertools.product((20, 55, 95), (-60, -20, 20, 60), (0, 30, 60)):
+    yield "folded", dict(shoulder=0.0, elbow=0.0, head=0.0, opening=JAW_MIN)
+    for sh, psi, tilt in itertools.product((20, 45, 70), (-60, -20, 20, 60), (0, 30, 60)):
         el = sh - psi                      # upper arm direction psi from the front horizontal
         hd = 90 - tilt - psi               # phone faces the user, leaned back by `tilt`
         if not (SHOULDER_RANGE[0] <= sh <= SHOULDER_RANGE[1] and ELBOW_RANGE[0] <= el <= ELBOW_RANGE[1]

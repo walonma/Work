@@ -39,7 +39,7 @@ KINEMATICS = {
         "folded": FOLDED,
         "use": {},
         "low": {"shoulder": -30, "elbow": -45, "head": 15},
-        "high": {"shoulder": 30, "elbow": 15, "head": -15},
+        "high": {"shoulder": 10, "elbow": -5, "head": -15},
         "landscape": {"rotate": 90},
     },
 }
