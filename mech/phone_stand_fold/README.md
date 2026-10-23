@@ -24,6 +24,7 @@
 | `STEP/phone_stand_fold_exploded.step` | 爆炸圖（拆件用） |
 | `STEP/sheet/*.step` | 鈑金件 |
 | `STEP/printed/*.step`、`STL/`、`3MF/` | 列印件，已經擺好列印方向（Bambu A1） |
+| `3MF/A1_plate_all_parts.3mf` | **A1 整盤列印檔**：5 個列印件已經擺好方向和位置，各自是獨立物件，拖進 Bambu Studio 選 PETG 就能切片列印 |
 | `GLB/phone_stand_fold.glb` | 網頁／手機預覽用 |
 | `src/lib/dims.py` | 所有尺寸參數 |
 | `checks/` | 干涉檢查、規格檢查 |
@@ -47,6 +48,8 @@
 | B3 | 右夾爪 | `jaw_right` | 60 × 38 × 49 | 7 g | 外側面朝下 |
 | B4 | 左夾爪 | `jaw_left` | 60 × 38 × 49 | 7 g | 外側面朝下 |
 | B5 | 捲線器 | `cable_reel` | 64 × 134 × 64 | 70 g | 直立列印，線盤下方是 45° 斜面，不用支撐 |
+
+**列印方式**：`3MF/A1_plate_all_parts.3mf` 一盤就能印完全部列印件（PETG 約 135 g，0.2 mm 層高、牆數 3–4、填充 25–40%）。也可以用 `3MF/<零件>.3mf` 單獨重印某一件。只有托架背面旋轉凸台（Ø36）的下半圈需要少量支撐（Bambu Studio 選「自動支撐、只在平台上」即可），其他零件都不用。
 
 ### C. 標準件
 
@@ -93,7 +96,8 @@
 ```bash
 export PYTHONPATH=src
 for f in src/sheet/*.py src/printed/*.py src/phone_stand_fold*.py src/phone_stand_folded.py; do python $f; done
-python checks/specs.py && python checks/interference.py
+python checks/specs.py && python checks/interference.py && python checks/plate.py
+python src/print_plate/combine_3mf.py   # 重新產生 A1 整盤 3MF
 ```
 
 這裡的 `python` 是 `uvx --no-config --managed-python --python 3.13 --from cadgen==0.7.26 python`。
