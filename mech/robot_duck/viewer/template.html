@@ -1,0 +1,385 @@
+<meta charset="utf-8">
+<title>機器小鴨概念審圖</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&family=Noto+Sans+TC:wght@400;500;700&display=swap">
+<style>
+/* Layout: review bench. 3D viewport left, joint + parts schedule rail right; stacks on phones. Accent is the duck's bill orange. */
+:root {
+  --bg: #f1f2ef;
+  --panel: #ffffff;
+  --ink: #20231f;
+  --muted: #646a61;
+  --line: #d9dcd4;
+  --accent: #d46a12;
+  --accent-soft: #fbe6d2;
+  --viewport: #e7e9e3;
+  --grid: #c6cbc0;
+  --font-ui: "IBM Plex Sans", "Noto Sans TC", "PingFang TC", "Microsoft JhengHei", system-ui, sans-serif;
+  --font-data: "IBM Plex Mono", "Noto Sans TC", ui-monospace, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #141613; --panel: #1b1e1a; --ink: #e6e8e2; --muted: #9aa094; --line: #2e322c;
+    --accent: #f0903c; --accent-soft: #3a2614; --viewport: #10120f; --grid: #2c302a; color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #141613; --panel: #1b1e1a; --ink: #e6e8e2; --muted: #9aa094; --line: #2e322c;
+  --accent: #f0903c; --accent-soft: #3a2614; --viewport: #10120f; --grid: #2c302a; color-scheme: dark;
+}
+[hidden] { display: none !important; }
+html, body { height: 100%; }
+body {
+  background: var(--bg); color: var(--ink); font-family: var(--font-ui); font-size: 14px;
+  display: grid; grid-template-columns: minmax(0, 1fr) 360px; grid-template-rows: auto minmax(0, 1fr);
+  height: 100%; overflow: hidden;
+}
+header {
+  grid-column: 1 / -1; display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 16px;
+  padding-block: 12px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
+  border-bottom: 1px solid var(--line); background: var(--panel);
+}
+header h1 { margin: 0; font-size: 17px; font-weight: 600; text-wrap: balance; }
+header .meta { color: var(--muted); font-family: var(--font-data); font-size: 12px; }
+#stage { position: relative; min-width: 0; min-height: 0; background: var(--viewport); }
+#stage canvas { display: block; width: 100%; height: 100%; touch-action: none; }
+.hud { position: absolute; left: 12px; bottom: 12px; display: flex; flex-wrap: wrap; gap: 6px; margin-left: env(safe-area-inset-left, 0px); }
+.hud button, .seg button, .row-actions button {
+  font: 500 12px var(--font-ui); color: var(--ink); background: var(--panel); border: 1px solid var(--line);
+  border-radius: 6px; padding: 6px 10px; cursor: pointer;
+}
+.hud button[aria-pressed="true"], .seg button[aria-pressed="true"] { background: var(--accent-soft); border-color: var(--accent); color: var(--accent); }
+button:focus-visible, input:focus-visible, summary:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.readout {
+  position: absolute; right: 12px; top: 12px; background: var(--panel); border: 1px solid var(--line); border-radius: 8px;
+  padding: 8px 10px; font-family: var(--font-data); font-size: 12px; display: grid; grid-template-columns: auto auto; gap: 2px 12px;
+  margin-right: env(safe-area-inset-right, 0px); font-variant-numeric: tabular-nums;
+}
+.readout dt { color: var(--muted); }
+.readout dd { margin: 0; text-align: right; }
+.hint { position: absolute; left: 12px; top: 12px; color: var(--muted); font-size: 12px; margin-left: env(safe-area-inset-left, 0px); max-width: 60%; }
+aside {
+  min-height: 0; overflow-y: auto; background: var(--panel); border-left: 1px solid var(--line);
+  padding-block: 14px; padding-left: 16px; padding-right: max(16px, env(safe-area-inset-right, 0px));
+  display: flex; flex-direction: column; gap: 18px;
+}
+section h2 { margin: 0 0 8px; font-size: 11px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
+.seg { display: flex; flex-wrap: wrap; gap: 6px; }
+details { border-top: 1px solid var(--line); padding-top: 6px; margin-top: 8px; }
+summary { cursor: pointer; font-weight: 600; font-size: 13px; list-style-position: inside; }
+summary .count { color: var(--muted); font-weight: 400; font-family: var(--font-data); font-size: 12px; margin-left: 6px; }
+.slider { display: grid; grid-template-columns: 78px minmax(0, 1fr) 46px; align-items: center; gap: 8px; margin-top: 6px; }
+.slider label { font-size: 13px; }
+.slider output { font-family: var(--font-data); font-size: 12px; text-align: right; font-variant-numeric: tabular-nums; }
+.slider input { width: 100%; accent-color: var(--accent); }
+.group-head { display: flex; align-items: center; gap: 8px; }
+.group-head input { margin: 0; }
+.part { display: grid; grid-template-columns: 18px 12px minmax(0, 1fr) auto; align-items: center; gap: 8px; padding: 4px 6px; border-radius: 6px; cursor: pointer; }
+.part:hover { background: var(--bg); }
+.part.sel { background: var(--accent-soft); }
+.part input { margin: 0; }
+.swatch { width: 12px; height: 12px; border-radius: 3px; border: 1px solid var(--line); }
+.part .name { font-size: 13px; overflow-wrap: anywhere; }
+.part .mass { font-family: var(--font-data); font-size: 11px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.row-actions { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+#info { font-size: 13px; display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 4px 12px; margin: 0; }
+#info dt { color: var(--muted); }
+#info dd { margin: 0; font-family: var(--font-data); font-size: 12px; overflow-wrap: anywhere; }
+#info .empty { grid-column: 1 / -1; color: var(--muted); font-family: var(--font-ui); }
+.loading { position: absolute; inset: 0; display: grid; place-items: center; color: var(--muted); font-size: 13px; }
+@media (max-width: 760px) {
+  body { grid-template-columns: minmax(0, 1fr); grid-template-rows: auto 58vh auto; height: auto; overflow: auto; }
+  aside { border-left: 0; border-top: 1px solid var(--line); overflow: visible; padding-left: max(16px, env(safe-area-inset-left, 0px)); }
+  .hint { display: none; }
+}
+</style>
+
+<header>
+  <h1>機器小鴨 · 3D 概念審圖</h1>
+  <span class="meta">mech/robot_duck · Microduck 級 · 15 關節 · RK3566 · 單位 mm</span>
+</header>
+
+<main id="stage" aria-label="3D 檢視區">
+  <div class="loading" id="loading">正在載入 3D 模型…</div>
+  <div class="hint">拖曳旋轉 · 右鍵或雙指平移 · 滾輪縮放 · 點零件看資料</div>
+  <dl class="readout" aria-live="polite">
+    <dt>顯示零件</dt><dd id="r-n">–</dd>
+    <dt>顯示重量</dt><dd id="r-m">–</dd>
+    <dt>頭頂高度</dt><dd id="r-h">–</dd>
+  </dl>
+  <div class="hud">
+    <button id="v-iso" type="button">等角</button>
+    <button id="v-front" type="button">正視</button>
+    <button id="v-side" type="button">側視</button>
+    <button id="v-top" type="button">俯視</button>
+    <button id="v-xray" type="button" aria-pressed="false">透視外殼</button>
+    <button id="v-edges" type="button" aria-pressed="true">輪廓線</button>
+  </div>
+</main>
+
+<aside>
+  <section>
+    <h2>姿勢</h2>
+    <div class="seg" id="presets"></div>
+    <div id="sliders"></div>
+  </section>
+  <section>
+    <h2>料件</h2>
+    <div id="parts"></div>
+    <div class="row-actions">
+      <button id="a-all" type="button">全部顯示</button>
+      <button id="a-iso" type="button">只顯示選取件</button>
+      <button id="a-inside" type="button">只看內部（隱藏外殼）</button>
+    </div>
+  </section>
+  <section>
+    <h2>選取料件</h2>
+    <dl id="info"><dd class="empty">在清單或 3D 圖上點一個零件。</dd></dl>
+  </section>
+</aside>
+
+<script id="model-data" type="application/json">/*DATA*/</script>
+<script type="importmap">
+{ "imports": {
+  "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+  "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+} }
+</script>
+<script type="module">
+import * as THREE from "three";
+import { OrbitControls } from "three/addons/controls/OrbitControls.js";
+
+const DATA = JSON.parse(document.getElementById("model-data").textContent);
+const GROUPS = [["actuator", "伺服與舵盤"], ["frame", "結構件"], ["cosmetic", "外殼與外觀件"], ["electronics", "電子模組"]];
+const POSE_ZH = { stand: "站立", crouch: "蹲下", look_left: "看左邊", quack: "張嘴叫", step_left: "跨步", nap: "趴睡" };
+const CHAINS = [["左腿", (j) => j.name.startsWith("l_")], ["右腿", (j) => j.name.startsWith("r_")], ["脖子與頭", (j) => !/^[lr]_/.test(j.name)]];
+const DEG = Math.PI / 180;
+
+// ---------------------------------------------------------------- scene
+const stage = document.getElementById("stage");
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+stage.prepend(renderer.domElement);
+const scene = new THREE.Scene();
+const camera = new THREE.PerspectiveCamera(30, 1, 5, 4000);
+camera.up.set(0, 0, 1);
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.enableDamping = true;
+controls.target.set(20, 0, 125);
+scene.add(new THREE.HemisphereLight(0xffffff, 0x8f948a, 1.5));
+const sun = new THREE.DirectionalLight(0xffffff, 1.7);
+sun.position.set(500, -400, 700);
+scene.add(sun);
+const fill = new THREE.DirectionalLight(0xffffff, 0.55);
+fill.position.set(-400, 300, 200);
+scene.add(fill);
+const grid = new THREE.GridHelper(400, 40);
+grid.rotation.x = Math.PI / 2;
+scene.add(grid);
+
+function cssVar(n) { return getComputedStyle(document.documentElement).getPropertyValue(n).trim(); }
+function applyTheme() { scene.background = new THREE.Color(cssVar("--viewport")); grid.material.color = new THREE.Color(cssVar("--grid")); }
+applyTheme();
+matchMedia("(prefers-color-scheme: dark)").addEventListener("change", applyTheme);
+new MutationObserver(applyTheme).observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
+
+function decode(b64, Type) {
+  const bin = atob(b64), buf = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) buf[i] = bin.charCodeAt(i);
+  return new Type(buf.buffer);
+}
+const hex = (c) => "#" + c.slice(0, 3).map((v) => Math.round(Math.max(0, Math.min(1, v)) * 255).toString(16).padStart(2, "0")).join("");
+
+const parts = DATA.parts.map((p) => {
+  let geo = new THREE.BufferGeometry();
+  geo.setAttribute("position", new THREE.BufferAttribute(decode(p.pos, Float32Array), 3));
+  geo.setIndex(new THREE.BufferAttribute(decode(p.idx, Uint32Array), 1));
+  geo.computeVertexNormals();   // OCCT meshes share vertices per face: smooth within a face, crisp at edges
+  const alpha = p.rgba[3];
+  const mat = new THREE.MeshStandardMaterial({
+    color: new THREE.Color(hex(p.rgba)), roughness: p.group === "actuator" ? 0.45 : 0.6,
+    metalness: p.key.startsWith("horn_") ? 0.6 : 0.05, transparent: alpha < 1, opacity: alpha, side: THREE.DoubleSide,
+  });
+  const mesh = new THREE.Mesh(geo, mat);
+  mesh.matrixAutoUpdate = false;
+  const edges = new THREE.LineSegments(new THREE.EdgesGeometry(geo, 30), new THREE.LineBasicMaterial({ color: 0x141612, transparent: true, opacity: 0.35 }));
+  edges.matrixAutoUpdate = false;
+  mesh.userData.part = p;
+  scene.add(mesh, edges);
+  return { ...p, color: hex(p.rgba), alpha, mesh, edges, mat, visible: true };
+});
+document.getElementById("loading").hidden = true;
+
+// ---------------------------------------------------------------- kinematic tree
+const joints = Object.fromEntries(DATA.joints.map((j) => [j.name, j]));
+const pose = Object.fromEntries(DATA.joints.map((j) => [j.name, 0]));
+function jointMatrix(j, deg) {
+  const o = new THREE.Vector3(...j.origin);
+  const r = new THREE.Matrix4().makeRotationAxis(new THREE.Vector3(...j.axis).normalize(), deg * DEG);
+  return new THREE.Matrix4().makeTranslation(o.x, o.y, o.z).multiply(r).multiply(new THREE.Matrix4().makeTranslation(-o.x, -o.y, -o.z));
+}
+function frames() {
+  const M = { null: new THREE.Matrix4() };
+  const solve = (n) => {
+    if (M[n]) return M[n];
+    const j = joints[n];
+    M[n] = solve(j.parent ?? "null").clone().multiply(jointMatrix(j, pose[n]));
+    return M[n];
+  };
+  for (const n in joints) solve(n);
+  return M;
+}
+const rN = document.getElementById("r-n"), rM = document.getElementById("r-m"), rH = document.getElementById("r-h");
+const box = new THREE.Box3();
+function update() {
+  const M = frames();
+  for (const p of parts) {
+    const m = M[p.joint ?? "null"];
+    p.mesh.matrix.copy(m); p.edges.matrix.copy(m);
+    p.mesh.matrixWorldNeedsUpdate = p.edges.matrixWorldNeedsUpdate = true;
+  }
+  scene.updateMatrixWorld();
+  box.makeEmpty();
+  parts.filter((p) => p.key.startsWith("head_shell")).forEach((p) => box.expandByObject(p.mesh));
+  rH.textContent = `${box.max.z.toFixed(0)} mm`;
+  readCounts();
+}
+function readCounts() {
+  const vis = parts.filter((p) => p.visible);
+  rN.textContent = `${vis.length} / ${parts.length}`;
+  rM.textContent = `${vis.reduce((s, p) => s + p.mass, 0).toFixed(0)} g`;
+}
+
+// ---------------------------------------------------------------- pose UI
+const sliders = {};
+const slWrap = document.getElementById("sliders");
+for (const [title, test] of CHAINS) {
+  const det = document.createElement("details");
+  if (title === "脖子與頭") det.open = true;
+  const list = DATA.joints.filter(test);
+  det.innerHTML = `<summary>${title}<span class="count">${list.length} 軸</span></summary>`;
+  for (const j of list) {
+    const row = document.createElement("div");
+    row.className = "slider";
+    const [lo, hi] = j.limits;
+    row.innerHTML = `<label for="s-${j.name}" title="${j.servo}">${j.label}</label><input id="s-${j.name}" type="range" min="${lo}" max="${hi}" step="1" value="0"><output for="s-${j.name}">0°</output>`;
+    const input = row.querySelector("input"), out = row.querySelector("output");
+    input.addEventListener("input", () => { pose[j.name] = +input.value; out.textContent = input.value + "°"; markPreset(null); update(); });
+    sliders[j.name] = { input, out };
+    det.append(row);
+  }
+  slWrap.append(det);
+}
+function syncSliders() { for (const n in sliders) { sliders[n].input.value = pose[n]; sliders[n].out.textContent = Math.round(pose[n]) + "°"; } }
+
+const presetWrap = document.getElementById("presets");
+const presetBtns = {};
+let anim = null;
+const reduced = matchMedia("(prefers-reduced-motion: reduce)").matches;
+for (const [key, values] of Object.entries(DATA.poses)) {
+  const b = document.createElement("button");
+  b.type = "button"; b.textContent = POSE_ZH[key] ?? key; b.setAttribute("aria-pressed", "false");
+  b.addEventListener("click", () => { goTo(values); markPreset(key); });
+  presetBtns[key] = b; presetWrap.append(b);
+}
+function markPreset(key) { for (const k in presetBtns) presetBtns[k].setAttribute("aria-pressed", String(k === key)); }
+function goTo(values) {
+  const from = { ...pose }, target = Object.fromEntries(Object.keys(pose).map((n) => [n, values[n] ?? 0]));
+  const t0 = performance.now(), dur = reduced ? 0 : 800;
+  anim = (now) => {
+    const u = dur ? Math.min(1, (now - t0) / dur) : 1, e = u < 0.5 ? 2 * u * u : 1 - Math.pow(-2 * u + 2, 2) / 2;
+    for (const n in target) pose[n] = from[n] + (target[n] - from[n]) * e;
+    syncSliders(); update();
+    if (u >= 1) anim = null;
+  };
+}
+
+// ---------------------------------------------------------------- parts UI
+const listWrap = document.getElementById("parts");
+const rows = {};
+let selected = null;
+for (const [g, gLabel] of GROUPS) {
+  const members = parts.filter((p) => p.group === g);
+  const det = document.createElement("details");
+  const mass = members.reduce((s, p) => s + p.mass, 0);
+  det.innerHTML = `<summary><span class="group-head" style="display:inline-flex"><input type="checkbox" id="g-${g}" checked aria-label="顯示全部${gLabel}"> ${gLabel}</span><span class="count">${members.length} 件 · ${mass.toFixed(0)} g</span></summary>`;
+  const gInput = det.querySelector("input");
+  gInput.addEventListener("click", (e) => e.stopPropagation());
+  gInput.addEventListener("change", () => members.forEach((p) => setVisible(p, gInput.checked)));
+  for (const p of members) {
+    const row = document.createElement("div");
+    row.className = "part";
+    row.innerHTML = `<input type="checkbox" id="p-${p.key}" checked aria-label="顯示 ${p.label}"><span class="swatch" style="background:${p.color}"></span><span class="name">${p.label}</span><span class="mass">${p.mass} g</span>`;
+    const cb = row.querySelector("input");
+    cb.addEventListener("click", (e) => e.stopPropagation());
+    cb.addEventListener("change", () => setVisible(p, cb.checked));
+    row.addEventListener("click", () => select(p));
+    rows[p.key] = { row, cb, gInput, members };
+    det.append(row);
+  }
+  listWrap.append(det);
+}
+let edgesOn = true;
+function syncGroup(p) {
+  const r = rows[p.key], on = r.members.filter((m) => m.visible).length;
+  r.gInput.checked = on === r.members.length;
+  r.gInput.indeterminate = on > 0 && on < r.members.length;
+}
+function setVisible(p, v) {
+  p.visible = v; p.mesh.visible = v; p.edges.visible = v && edgesOn;
+  rows[p.key].cb.checked = v; syncGroup(p); readCounts();
+}
+const info = document.getElementById("info");
+const GL = Object.fromEntries(GROUPS);
+function select(p) {
+  selected = p;
+  for (const q of parts) {
+    rows[q.key].row.classList.toggle("sel", q === p);
+    q.mat.emissive = new THREE.Color(q === p ? 0xd46a12 : 0x000000);
+    q.mat.emissiveIntensity = q === p ? 0.5 : 0;
+  }
+  if (!p) { info.innerHTML = '<dd class="empty">在清單或 3D 圖上點一個零件。</dd>'; return; }
+  const j = p.joint ? joints[p.joint] : null;
+  info.innerHTML = `<dt>名稱</dt><dd>${p.label}</dd><dt>分類</dt><dd>${GL[p.group]}</dd>` +
+    `<dt>隨哪個關節動</dt><dd>${j ? j.label : "身體（不動）"}</dd>` +
+    (p.key.startsWith("servo_") ? `<dt>伺服等級</dt><dd>${joints[p.key.slice(6)].servo}</dd>` : "") +
+    `<dt>外形</dt><dd>${p.size.join(" × ")} mm</dd><dt>估計重量</dt><dd>${p.mass} g</dd><dt>模型代號</dt><dd>${p.key}</dd>`;
+}
+document.getElementById("a-all").addEventListener("click", () => parts.forEach((p) => setVisible(p, true)));
+document.getElementById("a-iso").addEventListener("click", () => { if (selected) parts.forEach((p) => setVisible(p, p === selected)); });
+document.getElementById("a-inside").addEventListener("click", () => parts.forEach((p) => setVisible(p, p.group !== "cosmetic" || p.key.startsWith("foot"))));
+
+const ray = new THREE.Raycaster();
+let down = null;
+renderer.domElement.addEventListener("pointerdown", (e) => { down = [e.clientX, e.clientY]; });
+renderer.domElement.addEventListener("pointerup", (e) => {
+  if (!down || Math.hypot(e.clientX - down[0], e.clientY - down[1]) > 4) return;
+  const r = renderer.domElement.getBoundingClientRect();
+  ray.setFromCamera(new THREE.Vector2(((e.clientX - r.left) / r.width) * 2 - 1, -((e.clientY - r.top) / r.height) * 2 + 1), camera);
+  const hit = ray.intersectObjects(parts.filter((p) => p.visible).map((p) => p.mesh))[0];
+  select(hit ? hit.object.userData.part : null);
+});
+
+// ---------------------------------------------------------------- views
+const VIEWS = { iso: [1, -1.15, 0.55], front: [1, 0, 0.03], side: [0, -1, 0.03], top: [0.001, 0, 1] };
+function view(dir) { camera.position.copy(controls.target).addScaledVector(new THREE.Vector3(...dir).normalize(), 620); }
+for (const k in VIEWS) document.getElementById(`v-${k}`).addEventListener("click", () => view(VIEWS[k]));
+let xray = false;
+document.getElementById("v-xray").addEventListener("click", (e) => {
+  xray = !xray; e.currentTarget.setAttribute("aria-pressed", String(xray));
+  for (const p of parts) if (p.group === "cosmetic" && !p.key.startsWith("foot")) {
+    p.mat.transparent = xray || p.alpha < 1; p.mat.opacity = xray ? 0.22 : p.alpha; p.mat.depthWrite = !xray; p.mat.needsUpdate = true;
+  }
+});
+document.getElementById("v-edges").addEventListener("click", (e) => {
+  edgesOn = !edgesOn; e.currentTarget.setAttribute("aria-pressed", String(edgesOn));
+  for (const p of parts) p.edges.visible = edgesOn && p.visible;
+});
+
+function resize() { const w = stage.clientWidth, h = stage.clientHeight; renderer.setSize(w, h, false); camera.aspect = w / h; camera.updateProjectionMatrix(); }
+new ResizeObserver(resize).observe(stage);
+view(VIEWS.iso); syncSliders(); markPreset("stand"); update(); resize();
+renderer.setAnimationLoop((now) => { if (anim) anim(now); controls.update(); renderer.render(scene, camera); });
+</script>
