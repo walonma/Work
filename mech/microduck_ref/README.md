@@ -14,6 +14,22 @@
 | `tools/mjcf_scan.py` | 解析 MJCF：連桿樹、關節、每個可見零件的網格與位置 |
 | `tools/export_viewer.py` | 讀 STL、精簡網格（每件 ≤ 9000 面）、輸出 `viewer/data.json` |
 | `tools/build_viewer.py` | 把資料嵌進 `viewer/template.html` |
+| `tools/export_step.py` | 輸出拆件 STEP：每個零件一個檔（`STEP/parts/*.stp`）＋指定姿勢的組立檔＋`BOM_microduck.csv` |
+| `tools/verify_step.py` | 讀回組立檔，檢查 70 個零件的位置與原廠模型一致 |
+| `BOM_microduck.csv` | 38 個料號、70 件：中文名稱、分類、數量、外形尺寸、對應檔案 |
+
+## 拆件 STEP
+
+原廠只公開網格（STL），沒有公開 Onshape 的實體 CAD，所以 STEP 用 **AP242 網格（tessellated）** 格式輸出：保留原廠網格的完整精度，不做任何修改，檔案也夠小（38 個零件約 30 MB）。SolidWorks、Fusion、Creo、NX 都能匯入，但匯入後是網格本體，不是可以改特徵的實體；要修改時需要在 CAD 裡轉成實體，或重新建模。
+
+組立檔依連桿分層（身體、左右腿各 5 節、脖子、頭），每個零件只存一份，多處使用時只記位置。`STAND`（站立）姿勢的零件放在原廠位置上；`FOLD`（收折）姿勢以身體為基準輸出，沒有移到地面上。
+
+```bash
+python tools/export_step.py SRC STAND     # 或 INIT / SIT / FOLD
+python tools/verify_step.py SRC STAND
+```
+
+`STEP/` 和打包檔不進 git，需要時用上面的指令重新產生。
 
 ## 從原廠模型讀到的機構
 

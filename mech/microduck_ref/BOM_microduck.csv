@@ -1,0 +1,39 @@
+﻿item,part,name_zh,group,qty,size_x_mm,size_y_mm,size_z_mm,triangles,step,stl_source
+1,xl330,伺服 XL330-M288,伺服,15,29.0,20.0,34.0,4126,STEP/parts/xl330.stp,assets/xl330.stl
+2,bottom_head_shell,頭殼（下）,外殼與外觀件,1,91.8,116.7,20.1,20970,STEP/parts/bottom_head_shell.stp,assets/bottom_head_shell.stl
+3,face_part,臉部面板,外殼與外觀件,1,87.7,12.5,44.6,11412,STEP/parts/face_part.stp,assets/face_part.stl
+4,foot_left,左腳掌,外殼與外觀件,1,40.1,54.0,16.9,19902,STEP/parts/foot_left.stp,assets/foot_left.stl
+5,foot_right,右腳掌,外殼與外觀件,1,40.1,54.0,16.9,19894,STEP/parts/foot_right.stp,assets/foot_right.stl
+6,jaw,下嘴喙,外殼與外觀件,1,91.4,68.7,29.4,9918,STEP/parts/jaw.stp,assets/jaw.stl
+7,jaw_soft,下嘴喙軟墊,外殼與外觀件,1,87.7,32.2,8.4,6726,STEP/parts/jaw_soft.stp,assets/jaw_soft.stl
+8,left_shell,身體左殼,外殼與外觀件,1,33.7,80.9,41.7,20970,STEP/parts/left_shell.stp,assets/left_shell.stl
+9,noenoeil,眼框,外殼與外觀件,1,30.0,9.5,30.0,984,STEP/parts/noenoeil.stp,assets/noenoeil.stl
+10,right_shell,身體右殼,外殼與外觀件,1,31.8,80.9,41.7,20970,STEP/parts/right_shell.stp,assets/right_shell.stl
+11,soft_mouth_top,上嘴喙軟墊,外殼與外觀件,1,87.8,32.6,3.3,7870,STEP/parts/soft_mouth_top.stp,assets/soft_mouth_top.stl
+12,sole_left,左腳底,外殼與外觀件,1,41.1,54.0,12.9,15788,STEP/parts/sole_left.stp,assets/sole_left.stl
+13,sole_right,右腳底,外殼與外觀件,1,41.1,54.0,12.9,15888,STEP/parts/sole_right.stp,assets/sole_right.stl
+14,top_head_shell,頭殼（上）,外殼與外觀件,1,91.8,122.7,46.3,16120,STEP/parts/top_head_shell.stp,assets/top_head_shell.stl
+15,elec_rpi_robot_hat_pcb,擴充板 PCB,電子模組,1,65.0,30.0,0.8,18856,STEP/parts/elec_rpi_robot_hat_pcb.stp,assets/elec_rpi_robot_hat_pcb.stl
+16,lens,相機鏡頭,電子模組,1,16.9,18.9,16.9,1872,STEP/parts/lens.stp,assets/lens.stl
+17,m12_lens_holder,M12 鏡頭座,電子模組,1,24.0,14.8,16.0,10992,STEP/parts/m12_lens_holder.stp,assets/m12_lens_holder.stl
+18,np_f970,電池（NP-F970 外形）,電子模組,1,38.6,20.6,70.8,20970,STEP/parts/np_f970.stp,assets/np_f970.stl
+19,pcb__raspberry_pi_zero_2_w,主板（Pi Zero 2W 外形）,電子模組,1,65.0,1.6,30.0,20970,STEP/parts/pcb__raspberry_pi_zero_2_w.stp,assets/pcb__raspberry_pi_zero_2_w.stl
+20,speaker,喇叭,電子模組,1,35.0,25.0,7.0,12,STEP/parts/speaker.stp,assets/speaker.stl
+21,seeed_bearing__configuration__22x16x4,軸承 22×16×4,軸承,11,22.0,22.0,4.0,20970,STEP/parts/seeed_bearing__configuration__22x16x4.stp,assets/seeed_bearing__configuration__22x16x4.stl
+22,seeed_bearing__configuration_default,軸承（踝）,軸承,3,15.0,15.0,3.0,20970,STEP/parts/seeed_bearing__configuration_default.stp,assets/seeed_bearing__configuration_default.stl
+23,ankle_left,左踝支架,結構件,1,39.5,36.5,25.5,4978,STEP/parts/ankle_left.stp,assets/ankle_left.stl
+24,ankle_right,右踝支架,結構件,1,39.5,36.5,25.5,4976,STEP/parts/ankle_right.stp,assets/ankle_right.stl
+25,banana_pcb_locker,主板固定座,結構件,1,54.1,3.8,6.7,1388,STEP/parts/banana_pcb_locker.stp,assets/banana_pcb_locker.stl
+26,bearing_roll,髖部側擺軸承座,結構件,2,23.0,3.0,40.0,2420,STEP/parts/bearing_roll.stp,assets/bearing_roll.stl
+27,hip_l,髖部支架,結構件,2,32.5,34.5,19.0,20970,STEP/parts/hip_l.stp,assets/hip_l.stl
+28,leg,小腿,結構件,2,8.0,20.0,58.0,14776,STEP/parts/leg.stp,assets/leg.stl
+29,motor_support,頭部馬達座,結構件,1,73.5,54.2,18.8,3616,STEP/parts/motor_support.stp,assets/motor_support.stl
+30,neck,脖子連桿,結構件,2,2.0,20.0,11.0,1468,STEP/parts/neck.stp,assets/neck.stl
+31,neck_pitch,頭部俯仰支架,結構件,1,35.0,18.0,27.7,7120,STEP/parts/neck_pitch.stp,assets/neck_pitch.stl
+32,power_support,電池座,結構件,1,54.5,17.0,83.5,12830,STEP/parts/power_support.stp,assets/power_support.stl
+33,trunk_base,身體骨架,結構件,1,57.0,36.0,3.0,3698,STEP/parts/trunk_base.stp,assets/trunk_base.stl
+34,upper_leg_left,左大腿,結構件,1,28.0,47.7,61.0,12250,STEP/parts/upper_leg_left.stp,assets/upper_leg_left.stl
+35,upper_leg_right,右大腿,結構件,1,28.0,47.7,61.0,12250,STEP/parts/upper_leg_right.stp,assets/upper_leg_right.stl
+36,upper_leg_rigidity_plate,大腿補強板,結構件,2,1.0,45.0,58.1,3600,STEP/parts/upper_leg_rigidity_plate.stp,assets/upper_leg_rigidity_plate.stl
+37,yaw2roll,髖部轉向→側擺支架,結構件,2,23.0,25.8,20.5,12404,STEP/parts/yaw2roll.stp,assets/yaw2roll.stl
+38,yaw_roll_motion,頭部轉向／側歪機構,結構件,1,34.0,35.9,22.5,5814,STEP/parts/yaw_roll_motion.stp,assets/yaw_roll_motion.stl
